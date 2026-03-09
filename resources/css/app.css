@@ -18,8 +18,14 @@
 
 @layer base {
     body {
-        background-color: #0a0a0a; /* Neutral-950 equivalent */
+        background-color: #0a0a0a;
         color: #ffffff;
+    }
+
+    /* Livewire wire:navigate progress bar rengi */
+    [x-ref="bar"] {
+        background-color: #c026d3 !important;
+        background-image: linear-gradient(to right, #c026d3, #7c3aed) !important;
     }
 }
 

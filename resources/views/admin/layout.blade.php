@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
-    <title>@yield('title', 'Admin Panel') - BannerArchive</title>
+    <title>{{ $title ?? 'Admin Panel' }} - BannerArchive</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -26,25 +26,31 @@
                     <span class="text-lg font-bold">BannerArchive</span>
                 </a>
             </div>
-            
+
+            {{--
+                wire:navigate → Livewire SPA navigasyonu
+                Sayfa yenilenmez! Sadece içerik değişir.
+                Tarayıcı geçmişi (back/forward) çalışır.
+                CSS/JS yeniden yüklenmez → çok hızlı geçiş.
+            --}}
             <nav class="flex-1 p-4 space-y-1">
-                <a href="{{ route('admin.dashboard') }}" 
+                <a href="{{ route('admin.dashboard') }}" wire:navigate
                    class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all {{ request()->routeIs('admin.dashboard') ? 'bg-fuchsia-600 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                     </svg>
                     Dashboard
                 </a>
-                
-                <a href="{{ route('admin.particles') }}" 
+
+                <a href="{{ route('admin.particles') }}" wire:navigate
                    class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all {{ request()->routeIs('admin.particles*') ? 'bg-fuchsia-600 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
                     </svg>
                     Particles
                 </a>
-                
-                <a href="{{ route('admin.settings') }}" 
+
+                <a href="{{ route('admin.settings') }}" wire:navigate
                    class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all {{ request()->routeIs('admin.settings') ? 'bg-fuchsia-600 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -53,7 +59,7 @@
                     Settings
                 </a>
 
-                <a href="{{ route('admin.login-history') }}"
+                <a href="{{ route('admin.login-history') }}" wire:navigate
                    class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all {{ request()->routeIs('admin.login-history') ? 'bg-fuchsia-600 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -61,7 +67,7 @@
                     Giriş Geçmişi
                 </a>
 
-                <a href="{{ route('admin.cache') }}"
+                <a href="{{ route('admin.cache') }}" wire:navigate
                    class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all {{ request()->routeIs('admin.cache') ? 'bg-fuchsia-600 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
@@ -69,7 +75,7 @@
                     Cache Yönetimi
                 </a>
             </nav>
-            
+
             <div class="p-4 border-t border-white/5">
                 <div class="flex items-center gap-3 mb-3 px-2">
                     <div class="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center">
@@ -91,34 +97,23 @@
                 </form>
             </div>
         </aside>
-        
+
         <!-- Main Content -->
         <main class="flex-1 overflow-auto">
             <!-- Header -->
             <header class="sticky top-0 z-10 bg-neutral-950/80 backdrop-blur-md border-b border-white/5 px-8 py-4">
-                <h1 class="text-xl font-bold">@yield('title', 'Dashboard')</h1>
+                <h1 class="text-xl font-bold">{{ $title ?? 'Dashboard' }}</h1>
             </header>
-            
+
             <!-- Content -->
             <div class="p-8">
-                @if(session('success'))
-                    <div class="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400">
-                        {{ session('success') }}
-                    </div>
-                @endif
-                
-                @if(session('error'))
-                    <div class="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
-                        {{ session('error') }}
-                    </div>
-                @endif
-                
-                @yield('content')
+                {{-- {{ $slot }} → Livewire component'ın HTML'i buraya gelir --}}
+                {{ $slot }}
             </div>
         </main>
     </div>
     @else
-        @yield('content')
+        {{ $slot }}
     @endauth
     @livewireScripts
 </body>
