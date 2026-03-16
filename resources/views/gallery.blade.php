@@ -3,8 +3,9 @@
 @section('title', $movie['title'] . ' - Galeri')
 
 @section('content')
-<div class="min-h-screen bg-neutral-950 text-white font-sans">
+<div class="flex flex-col min-h-screen bg-neutral-950 text-white font-sans">
 
+    <div class="flex-1">
     {{-- Hero Banner --}}
     @if($movie['backdrop_path'])
     <div class="relative h-72 md:h-[28rem] overflow-hidden">
@@ -158,7 +159,7 @@
         @endif
 
         {{-- Image Grids (her tab icin ayri, JS ile goster/gizle) --}}
-        <div class="relative">
+        <div class="relative overflow-hidden">
             @if(($particlesLayer ?? 'background') === 'background')
                 <div id="galleryParticles" class="absolute inset-0 z-0 pointer-events-none overflow-hidden"></div>
             @endif
@@ -278,8 +279,10 @@
             </div>
         </div>
 
-        @include('partials.footer')
     </div>
+    </div>
+
+    @include('partials.footer')
 
     {{-- Actor Modal --}}
     <div id="actorModal" class="fixed inset-0 z-50 hidden">

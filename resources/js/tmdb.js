@@ -340,7 +340,7 @@ export function initTMDB() {
                     </button>
                     <button id="downloadBtn" class="px-6 py-2.5 bg-white text-black font-bold rounded-lg hover:bg-fuchsia-500 hover:text-white transition-colors text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        <span>${modalState.selectedFormat.toUpperCase()} Indir</span>
+                        <span>${modalState.selectedFormat.toUpperCase()} İndir</span>
                     </button>
                 </div>
             </div>
@@ -438,14 +438,14 @@ export function initTMDB() {
         downloadBtn.disabled = true;
         downloadBtn.innerHTML = `
             <div class="w-4 h-4 border-2 border-neutral-400 border-t-black rounded-full animate-spin"></div>
-            <span>Indiriliyor...</span>
+            <span>İndiriliyor...</span>
         `;
 
         try {
             const tmdbSize = size === 'w1920' ? 'original' : size;
             const proxyUrl = `/proxy-image?path=${encodeURIComponent(imageData.file_path)}&size=${tmdbSize}`;
             const response = await fetch(proxyUrl);
-            if (! response.ok) throw new Error('Gorsel alinamadi');
+            if (! response.ok) throw new Error('Görsel alınamadı');
             const blob = await response.blob();
 
             const img = new Image();
@@ -484,8 +484,8 @@ export function initTMDB() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (error) {
-            console.error('Indirme hatasi:', error);
-            alert('Indirme sirasinda bir hata olustu.');
+            console.error('İndirme hatası:', error);
+            alert('İndirme sırasında bir hata oluştu.');
         } finally {
             downloadBtn.disabled = false;
             downloadBtn.innerHTML = originalHTML;

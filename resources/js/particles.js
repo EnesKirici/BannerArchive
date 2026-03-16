@@ -35,6 +35,10 @@ const defaultConfig = {
 };
 
 export async function initParticles() {
+    // Only initialize if the container element exists on this page
+    const container = document.getElementById('tsparticles');
+    if (!container) return;
+
     await loadSlim(tsParticles);
 
     // Try to fetch config from API

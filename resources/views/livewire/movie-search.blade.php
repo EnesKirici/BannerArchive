@@ -200,9 +200,9 @@ new class extends Component
         @if ($search !== '' && empty($this->getFilteredResults()))
             <div wire:loading.remove wire:target="search" class="text-center py-12">
                 @if (! empty($results) && $filter !== 'all')
-                    <p class="text-neutral-500">Bu kategoride sonuc bulunamadi.</p>
+                    <p class="text-neutral-500">Bu kategoride sonuç bulunamadı.</p>
                 @else
-                    <p class="text-neutral-500">Sonuc bulunamadi.</p>
+                    <p class="text-neutral-500">Sonuç bulunamadı.</p>
                 @endif
             </div>
         @endif

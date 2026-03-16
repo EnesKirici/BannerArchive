@@ -593,6 +593,14 @@ async function initGalleryParticles() {
         id: "galleryParticles",
         options: config
     });
+
+    // tsParticles v3 bug workaround: canvas.init() runs before actualOptions
+    // processes our fullScreen:false, so the canvas gets position:fixed incorrectly.
+    // Reset it to fill its container properly.
+    const particleCanvas = container.querySelector('canvas');
+    if (particleCanvas) {
+        particleCanvas.style.cssText = 'width: 100%; height: 100%;';
+    }
 }
 
 // ═══ ACTOR MODAL ═══

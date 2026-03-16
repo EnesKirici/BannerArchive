@@ -144,7 +144,7 @@ new class extends Component
             $this->quotes = $quotes;
             $this->usedModel = $service->getUsedModel();
         } else {
-            $this->error = 'Sozler uretilemedi. Lutfen tekrar deneyin.';
+            $this->error = 'Sözler üretilemedi. Lütfen tekrar deneyin.';
         }
 
         $this->loading = false;
@@ -252,7 +252,7 @@ new class extends Component
                 <div>
                     <h2 class="text-lg md:text-xl font-bold text-white flex items-center gap-2">
                         {{ $movie['title'] ?? '' }}
-                        <span class="text-xs font-normal text-neutral-500">- AI Banner Sozleri</span>
+                        <span class="text-xs font-normal text-neutral-500">- AI Banner Sözleri</span>
                     </h2>
                     <p class="text-xs text-neutral-500 mt-1">
                         {{ $movie['type'] ?? '' }} &middot; {{ isset($movie['release_date']) && $movie['release_date'] ? substr($movie['release_date'], 0, 4) : '' }}
@@ -293,7 +293,7 @@ new class extends Component
                         <img src="{{ $bannerUrl }}" alt="{{ $movie['title'] ?? '' }}"
                              class="max-w-full max-h-[50vh] object-contain rounded-lg">
                     @else
-                        <div class="text-neutral-600 text-sm">Gorsel yok</div>
+                        <div class="text-neutral-600 text-sm">Görsel yok</div>
                     @endif
                 </div>
 
@@ -306,8 +306,8 @@ new class extends Component
                     @if ($loading)
                         <div class="flex-1 flex flex-col items-center justify-center gap-4 p-8">
                             <div class="w-12 h-12 border-4 border-neutral-800 border-t-fuchsia-500 rounded-full animate-spin"></div>
-                            <p class="text-neutral-400 text-sm">AI sozler uretiyor...</p>
-                            <p class="text-neutral-600 text-xs">Bu islem birkaç saniye surebilir</p>
+                            <p class="text-neutral-400 text-sm">AI sözler üretiyor...</p>
+                            <p class="text-neutral-600 text-xs">Bu işlem birkaç saniye sürebilir</p>
                         </div>
 
                     {{-- ═══ ERROR STATE ═══ --}}
@@ -372,14 +372,14 @@ new class extends Component
                                 <input type="text"
                                        wire:model="style"
                                        wire:keydown.enter="regenerate"
-                                       placeholder="Stil belirt (ornek: epik, romantik, karanlik...)"
+                                       placeholder="Stil belirt (örnek: epik, romantik, karanlık...)"
                                        class="flex-1 px-3 py-2 bg-neutral-800 border border-white/10 rounded-lg text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-fuchsia-500 transition-colors">
                                 <button wire:click="regenerate"
                                         wire:loading.attr="disabled"
                                         class="cursor-pointer px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                    <span wire:loading.remove wire:target="regenerate">Yeniden Uret</span>
-                                    <span wire:loading wire:target="regenerate">Uretiyor...</span>
+                                    <span wire:loading.remove wire:target="regenerate">Yeniden Üret</span>
+                                    <span wire:loading wire:target="regenerate">Üretiyor...</span>
                                 </button>
                             </div>
 
@@ -398,13 +398,13 @@ new class extends Component
                                     <template x-if="!allCopied">
                                         <span class="flex items-center gap-2">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                                            Tumunu Kopyala ({{ count($quotes) }})
+                                            Tümünü Kopyala ({{ count($quotes) }})
                                         </span>
                                     </template>
                                     <template x-if="allCopied">
                                         <span class="flex items-center gap-2 text-green-400">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                                            Kopyalandi!
+                                            Kopyalandı!
                                         </span>
                                     </template>
                                 </button>
@@ -413,7 +413,7 @@ new class extends Component
                                 <button x-on:click="$dispatch('download-from-quotes', { movie: {{ Js::from($movie) }} })"
                                         class="cursor-pointer flex-1 py-2.5 bg-white text-black hover:bg-fuchsia-500 hover:text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                    Gorseli Indir
+                                    Görseli İndir
                                 </button>
                             </div>
                         </div>
