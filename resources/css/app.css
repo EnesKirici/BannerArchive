@@ -27,6 +27,10 @@
         cursor: pointer;
     }
 
+    [x-cloak] {
+        display: none !important;
+    }
+
     /* Livewire wire:navigate progress bar rengi */
     [x-ref="bar"] {
         background-color: #c026d3 !important;

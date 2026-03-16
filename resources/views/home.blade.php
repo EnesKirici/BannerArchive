@@ -42,7 +42,7 @@
                 <div class="px-4 bg-neutral-900 z-20">
                     <h3 class="py-3 text-[10px] uppercase tracking-[0.2em] text-fuchsia-500 font-bold flex items-center gap-2 border-b border-white/5">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>
-                        Popüler Filmler
+                        Trend Filmler
                     </h3>
                 </div>
                 <div class="sidebar-slider overflow-hidden h-full px-4 scrollbar-hide">
@@ -78,7 +78,7 @@
                 <div class="px-4 bg-neutral-900 z-20">
                     <h3 class="py-3 text-[10px] uppercase tracking-[0.2em] text-purple-500 font-bold flex items-center gap-2 border-b border-white/5">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                        Popüler Diziler
+                        Trend Diziler
                     </h3>
                 </div>
                 <div class="sidebar-slider overflow-hidden h-full px-4 scrollbar-hide">
@@ -122,21 +122,77 @@
         <div class="absolute inset-0 bg-linear-to-b from-transparent via-neutral-950/50 to-neutral-950 pointer-events-none z-1"></div>
 
         <!-- Hero Section -->
-        <div class="relative w-full min-h-[60vh] py-16 px-4 md:px-12 flex flex-col items-center justify-center text-center z-10">
-            <h1 class="relative text-4xl md:text-6xl font-black tracking-tighter mb-4">
+        <div class="relative w-full px-4 md:px-12 flex flex-col items-center pt-[12vh] text-center z-10">
+            <h1 class="relative text-5xl md:text-7xl font-black tracking-tighter mb-4">
                 <span class="block text-white/90">Search Movies</span>
                 <span class="block bg-clip-text text-transparent bg-linear-to-r from-fuchsia-500 via-purple-500 to-cyan-400">& TV Shows</span>
             </h1>
-            <p class="text-neutral-400 text-sm md:text-base mb-8">Download high-resolution banners & backdrops</p>
+            <p class="text-neutral-400 text-sm md:text-base mb-10 max-w-md">Film ve dizi bannerlarını, afişlerini ve logolarını yüksek çözünürlükte indirin</p>
 
-            {{-- ═══ LIVEWIRE: MovieSearch Component ═══
-                 Arama cubugu, filtre butonlari ve sonuc grid'i
-                 Eski JS-driven arama yerine Livewire ile sunucu tarafinda calisir
-                 <livewire:component-adi /> → Gomulu (embedded) component kullanimi --}}
             <livewire:movie-search />
+
+            {{-- Özellik Rozetleri --}}
+            <div class="flex flex-wrap justify-center gap-3 mt-14">
+                @foreach([
+                    ['HD Bannerlar', 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'],
+                    ['Toplu İndirme', 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'],
+                    ['Format Dönüştürme', 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'],
+                    ['Afişler & Logolar', 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'],
+                ] as [$featureLabel, $featureIcon])
+                    <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-neutral-400 text-xs font-medium">
+                        <svg class="w-3.5 h-3.5 text-fuchsia-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $featureIcon }}"/></svg>
+                        {{ $featureLabel }}
+                    </div>
+                @endforeach
+            </div>
         </div>
+
+        {{-- Popüler İçerikler --}}
+        @php
+            $trendingItems = collect($popularMovies)->merge($popularShows)->filter(fn($i) => !empty($i['backdrop_path']))->shuffle()->take(8);
+        @endphp
+        @if($trendingItems->isNotEmpty())
+        <div class="relative z-10 w-full max-w-[1920px] mx-auto px-4 md:px-12 pb-16 mt-8">
+            <div class="flex items-center gap-4 mb-6">
+                <h2 class="text-sm font-bold text-neutral-400 uppercase tracking-widest shrink-0">Günün Trendleri</h2>
+                <div class="flex-1 h-px bg-white/5"></div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                @foreach($trendingItems as $item)
+                    <a href="{{ route('gallery', ['type' => $item['raw_type'], 'id' => $item['id']]) }}"
+                       class="group relative aspect-video rounded-xl overflow-hidden bg-neutral-900 border border-white/5 hover:border-fuchsia-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(217,70,239,0.15)]">
+                        <img src="https://image.tmdb.org/t/p/w780{{ $item['backdrop_path'] }}"
+                             alt="{{ $item['title'] }}"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                             loading="lazy">
+                        <div class="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent"></div>
+                        <div class="absolute bottom-0 left-0 right-0 p-3">
+                            <h3 class="text-white font-bold text-sm leading-tight truncate group-hover:text-fuchsia-400 transition-colors">{{ $item['title'] }}</h3>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-600/30 text-fuchsia-400 border border-fuchsia-600/20">{{ $item['type'] }}</span>
+                                @if($item['release_date'])
+                                    <span class="text-[10px] text-neutral-400">{{ \Carbon\Carbon::parse($item['release_date'])->format('Y') }}</span>
+                                @endif
+                                @if($item['vote_average'])
+                                    <span class="text-[10px] text-yellow-500 flex items-center gap-0.5">
+                                        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                        {{ number_format($item['vote_average'], 1) }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+        @endif
     </main>
 </div>
+
+{{-- Gallery view mode ayari JS'e aktarilir --}}
+<script>
+    window.galleryViewMode = @json($galleryViewMode);
+</script>
 
 <!-- Image Modal (JS-driven — Canvas API gerektigi icin Livewire'a cevirilmedi) -->
 <div id="imageModal" class="fixed inset-0 z-60 hidden">

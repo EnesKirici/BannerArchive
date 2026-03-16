@@ -70,22 +70,24 @@ class QuoteGeneratorService
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             try {
-                $response = Http::timeout(30)->post(
-                    "{$this->baseUrl}/{$model}:generateContent?key={$this->apiKey}",
-                    [
-                        'contents' => [
-                            [
-                                'parts' => [
-                                    ['text' => $prompt],
+                $response = Http::timeout(30)
+                    ->withHeader('x-goog-api-key', $this->apiKey)
+                    ->post(
+                        "{$this->baseUrl}/{$model}:generateContent",
+                        [
+                            'contents' => [
+                                [
+                                    'parts' => [
+                                        ['text' => $prompt],
+                                    ],
                                 ],
                             ],
-                        ],
-                        'generationConfig' => [
-                            'temperature' => 0.9,
-                            'maxOutputTokens' => 8192,
-                        ],
-                    ]
-                );
+                            'generationConfig' => [
+                                'temperature' => 0.9,
+                                'maxOutputTokens' => 8192,
+                            ],
+                        ]
+                    );
 
                 if ($response->status() === 429) {
                     $this->lastError = "Model {$model} rate limit aşıldı, sonraki modele geçiliyor...";

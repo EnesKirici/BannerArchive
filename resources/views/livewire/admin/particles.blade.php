@@ -175,6 +175,31 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
         unset($this->themes, $this->activeTheme);
     }
 
+    /**
+     * Tema config'inden canvas preview parametreleri çıkarır
+     *
+     * @return array<string, mixed>
+     */
+    public function getPreviewParams(ParticleTheme $theme): array
+    {
+        $config = $theme->config;
+        $shapeType = $config['particles']['shape']['type'] ?? 'circle';
+        $colorVal = $config['particles']['color']['value'] ?? $theme->preview_color ?? '#a855f7';
+
+        return [
+            'color' => $theme->preview_color ?? '#a855f7',
+            'colors' => is_array($colorVal) ? $colorVal : [$colorVal],
+            'shape' => is_array($shapeType) ? $shapeType[0] : $shapeType,
+            'sides' => $config['particles']['shape']['options']['polygon']['sides'] ?? 6,
+            'points' => $config['particles']['shape']['options']['star']['sides'] ?? 5,
+            'links' => $config['particles']['links']['enable'] ?? false,
+            'direction' => $config['particles']['move']['direction'] ?? 'none',
+            'speed' => $config['particles']['move']['speed'] ?? 1,
+            'count' => min($config['particles']['number']['value'] ?? 30, 35),
+            'wobble' => ($config['particles']['wobble']['enable'] ?? false),
+        ];
+    }
+
 };
 ?>
 
@@ -214,17 +239,17 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
         <div wire:key="theme-{{ $theme->id }}"
              class="bg-neutral-900 rounded-xl border {{ $theme->is_active ? 'border-fuchsia-500' : 'border-white/5' }} overflow-hidden group">
             {{-- Preview --}}
-            <div class="h-32 relative" style="background: linear-gradient(135deg, {{ $theme->preview_color }}20, transparent)">
-                <div class="absolute inset-0 flex items-center justify-center">
-                    <div class="w-16 h-16 rounded-full opacity-30" style="background: {{ $theme->preview_color }}; filter: blur(20px);"></div>
-                </div>
+            @php $pp = $this->getPreviewParams($theme); @endphp
+            <div class="h-36 relative overflow-hidden bg-neutral-950"
+                 x-data="particlePreview({{ Js::from($pp) }})" x-on:remove.window="destroy()">
+                <canvas x-ref="canvas" class="w-full h-full"></canvas>
                 @if($theme->is_active)
-                <div class="absolute top-3 right-3 px-2 py-1 bg-fuchsia-500 text-white text-xs font-bold rounded">
-                    AKTİF
+                <div class="absolute top-3 right-3 px-2 py-1 bg-fuchsia-500 text-white text-[10px] font-bold rounded-md uppercase tracking-wider">
+                    Aktif
                 </div>
                 @endif
                 @if($theme->is_preset)
-                <div class="absolute top-3 left-3 px-2 py-1 bg-neutral-800 text-neutral-400 text-xs rounded">
+                <div class="absolute top-3 left-3 px-2 py-0.5 bg-white/10 backdrop-blur-sm text-neutral-300 text-[10px] rounded-md">
                     Preset
                 </div>
                 @endif
@@ -232,43 +257,43 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
 
             {{-- Info --}}
             <div class="p-4">
-                <div class="flex items-center gap-3 mb-3">
-                    <div class="w-4 h-4 rounded-full" style="background: {{ $theme->preview_color }}"></div>
-                    <h3 class="font-semibold">{{ $theme->name }}</h3>
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-3 h-3 rounded-full" style="background: {{ $theme->preview_color }}"></div>
+                        <h3 class="font-semibold text-sm">{{ $theme->name }}</h3>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button wire:click="openEditModal({{ $theme->id }})"
+                                class="p-1.5 text-neutral-500 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                                title="Düzenle">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                            </svg>
+                        </button>
+                        @if(!$theme->is_preset && !$theme->is_active)
+                        <button wire:click="deleteTheme({{ $theme->id }})"
+                                wire:confirm="Bu temayı silmek istediğinizden emin misiniz?"
+                                class="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                title="Sil">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                        @endif
+                    </div>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    @if(!$theme->is_active)
-                    <button wire:click="activateTheme({{ $theme->id }})"
-                            wire:loading.attr="disabled"
-                            class="flex-1 px-3 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
-                        Aktifleştir
-                    </button>
-                    @else
-                    <span class="flex-1 px-3 py-2 bg-neutral-800 text-neutral-500 text-sm rounded-lg text-center cursor-not-allowed">
-                        Aktif
-                    </span>
-                    @endif
-
-                    {{-- wire:click → PHP metodu çağırır --}}
-                    <button wire:click="openEditModal({{ $theme->id }})"
-                            class="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-white text-sm rounded-lg transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                        </svg>
-                    </button>
-
-                    @if(!$theme->is_preset && !$theme->is_active)
-                    {{-- wire:confirm → Tıklamadan önce onay dialogu gösterir --}}
-                    <button wire:click="deleteTheme({{ $theme->id }})"
-                            wire:confirm="Bu temayı silmek istediğinizden emin misiniz?"
-                            class="px-3 py-2 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-sm rounded-lg transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                    </button>
-                    @endif
+                @if(!$theme->is_active)
+                <button wire:click="activateTheme({{ $theme->id }})"
+                        wire:loading.attr="disabled"
+                        class="w-full px-3 py-1.5 bg-white/5 hover:bg-fuchsia-600 disabled:opacity-50 text-neutral-400 hover:text-white text-xs font-medium rounded-lg transition-all">
+                    Aktifleştir
+                </button>
+                @else
+                <div class="w-full px-3 py-1.5 bg-fuchsia-500/10 text-fuchsia-400 text-xs font-medium rounded-lg text-center">
+                    Kullanımda
                 </div>
+                @endif
             </div>
         </div>
         @empty
@@ -351,11 +376,13 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
                 </div>
 
                 {{-- Preview --}}
-                <div class="w-1/2 bg-neutral-950 relative flex items-center justify-center">
-                    <div class="text-center text-neutral-600">
-                        <div class="w-24 h-24 rounded-full mx-auto mb-4 opacity-50" style="background: {{ $themeColor }}; filter: blur(30px);"></div>
-                        <p class="text-sm">Renk Önizleme</p>
-                        <p class="text-xs text-neutral-700 mt-1">{{ $themeColor }}</p>
+                <div class="w-1/2 bg-neutral-950 relative overflow-hidden"
+                     x-data="particlePreview({ color: $wire.themeColor || '#a855f7', colors: [$wire.themeColor || '#a855f7'], shape: 'circle', sides: 6, points: 5, links: true, direction: 'none', speed: 1, count: 50, wobble: false })"
+                     x-on:remove.window="destroy()">
+                    <canvas x-ref="canvas" class="w-full h-full"></canvas>
+                    <div class="absolute bottom-4 left-4 text-xs text-neutral-600">
+                        <span class="inline-block w-2 h-2 rounded-full mr-1" style="background: {{ $themeColor }}"></span>
+                        {{ $themeColor }}
                     </div>
                 </div>
             </div>

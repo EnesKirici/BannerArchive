@@ -16,6 +16,13 @@
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/';
 
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
+
 const IMAGE_SIZES = {
     backdrop: ['w300', 'w780', 'w1280', 'w1920', 'original'],
     poster: ['w92', 'w154', 'w185', 'w342', 'w500', 'w780', 'original'],
@@ -43,14 +50,28 @@ export function initTMDB() {
 
     window.closeModal = closeModal;
 
+    // ═══ GALLERY VIEW MODE HELPER ═══
+    function getViewMode() {
+        return window.galleryViewMode || 'gallery';
+    }
+
+    function navigateToGallery(movie) {
+        window.location.href = `/gallery/${movie.raw_type}/${movie.id}`;
+    }
+
     // ═══ LIVEWIRE EVENT KOPRUSU ═══
     // MovieSearch component'i kart tiklandiginda 'open-image-modal' dispatch eder
-    // Bu event'i yakalayip image modal'i aciyoruz
+    // gallery_view_mode ayarina gore modal veya galeri sayfasina yonlendirir
     window.addEventListener('open-image-modal', (e) => {
         const movie = e.detail?.movie || e.detail?.[0]?.movie;
 
         if (movie) {
-            openModal(movie);
+            const mode = getViewMode();
+            if (mode === 'gallery') {
+                navigateToGallery(movie);
+            } else {
+                openModal(movie);
+            }
         }
     });
 
@@ -86,8 +107,13 @@ export function initTMDB() {
             window.Livewire.dispatch('select-from-sidebar', { movie });
         }
 
-        // Ayni zamanda image modal'i ac
-        openModal(movie);
+        // gallery_view_mode ayarina gore modal veya galeri sayfasina yonlendir
+        const mode = getViewMode();
+        if (mode === 'gallery') {
+            navigateToGallery(movie);
+        } else {
+            openModal(movie);
+        }
 
         // Mobilede sidebar'i kapat
         if (window.innerWidth < 768) {
@@ -237,8 +263,8 @@ export function initTMDB() {
             <!-- Header -->
             <div class="p-4 md:p-6 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div>
-                    <h2 class="text-lg md:text-xl font-bold text-white">${modalState.movie.title}</h2>
-                    <p class="text-xs text-neutral-500 mt-1">${modalState.movie.type} &middot; ${modalState.movie.release_date ? modalState.movie.release_date.split('-')[0] : ''}</p>
+                    <h2 class="text-lg md:text-xl font-bold text-white">${escapeHtml(modalState.movie.title)}</h2>
+                    <p class="text-xs text-neutral-500 mt-1">${escapeHtml(modalState.movie.type)} &middot; ${modalState.movie.release_date ? escapeHtml(modalState.movie.release_date.split('-')[0]) : ''}</p>
                 </div>
                 <button onclick="closeModal()" class="p-2 bg-neutral-800 rounded-full hover:bg-fuchsia-600 text-white transition-colors shrink-0">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -304,6 +330,10 @@ export function initTMDB() {
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
+                    <button id="openGalleryBtn" class="${getViewMode() === 'both' ? '' : 'hidden'} px-5 py-2.5 bg-neutral-800 text-white font-bold rounded-lg hover:bg-cyan-600 transition-all text-sm flex items-center gap-2 border border-white/10">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                        <span>Galeri'de Ac</span>
+                    </button>
                     <button id="generateQuotesBtn" class="px-5 py-2.5 bg-linear-to-r from-purple-600 to-fuchsia-600 text-white font-bold rounded-lg hover:from-purple-500 hover:to-fuchsia-500 transition-all text-sm flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
                         <span>AI Sozleri</span>
@@ -388,6 +418,14 @@ export function initTMDB() {
                         results: currentResults,
                     });
                 }
+            });
+        }
+
+        // ═══ Galeri'de Ac butonu → Gallery sayfasina yonlendir ═══
+        const openGalleryBtn = document.getElementById('openGalleryBtn');
+        if (openGalleryBtn) {
+            openGalleryBtn.addEventListener('click', () => {
+                navigateToGallery(modalState.movie);
             });
         }
     }
