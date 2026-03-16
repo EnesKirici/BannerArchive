@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Crypt;
 
 class Setting extends Model
 {
@@ -13,16 +14,32 @@ class Setting extends Model
         'updated_at' => 'datetime',
     ];
 
+    /** @var list<string> */
+    private static array $sensitiveKeys = [
+        'tmdb_api_key',
+        'gemini_api_key',
+    ];
+
     /**
      * Get setting value with proper type casting
      */
     public function getTypedValueAttribute(): mixed
     {
+        $value = $this->value;
+
+        if (in_array($this->key, self::$sensitiveKeys) && $value) {
+            try {
+                $value = Crypt::decryptString($value);
+            } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+                // Henüz şifrelenmemiş eski veri — olduğu gibi döndür
+            }
+        }
+
         return match ($this->type) {
-            'boolean' => filter_var($this->value, FILTER_VALIDATE_BOOLEAN),
-            'integer' => (int) $this->value,
-            'json' => json_decode($this->value, true),
-            default => $this->value,
+            'boolean' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
+            'integer' => (int) $value,
+            'json' => json_decode($value, true),
+            default => $value,
         };
     }
 
@@ -43,6 +60,10 @@ class Setting extends Model
     {
         if ($type === 'json' && is_array($value)) {
             $value = json_encode($value);
+        }
+
+        if (in_array($key, self::$sensitiveKeys) && $value !== '' && $value !== null) {
+            $value = Crypt::encryptString((string) $value);
         }
 
         return static::updateOrCreate(

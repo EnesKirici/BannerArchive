@@ -509,30 +509,17 @@ export function initTMDB() {
 export function initSidebarToggle() {
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
-    const toggleArrow = document.getElementById('toggleArrow');
 
     if (! sidebar || ! toggleBtn) return;
 
-    let collapsed = false;
+    const container = sidebar.parentElement;
 
     toggleBtn.addEventListener('click', () => {
-        collapsed = ! collapsed;
+        const isCollapsed = container.dataset.sidebarCollapsed === 'true';
+        const newState = ! isCollapsed;
 
-        if (collapsed) {
-            sidebar.style.width = '0';
-            sidebar.style.minWidth = '0';
-            sidebar.classList.add('overflow-hidden');
-            sidebar.style.borderRightWidth = '0';
-            toggleBtn.style.left = '0px';
-            toggleArrow.classList.add('rotate-180');
-        } else {
-            sidebar.style.width = '';
-            sidebar.style.minWidth = '';
-            sidebar.classList.remove('overflow-hidden');
-            sidebar.style.borderRightWidth = '';
-            toggleBtn.style.left = '';
-            toggleArrow.classList.remove('rotate-180');
-        }
+        container.dataset.sidebarCollapsed = newState;
+        document.cookie = 'sidebar_collapsed=' + newState + ';path=/;max-age=31536000;SameSite=Lax';
     });
 }
 

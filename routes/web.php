@@ -25,7 +25,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Admin Routes (protected) — Livewire Volt full-page components
 // Volt::route('/url', 'component-name') → Controller'a gerek yok, component her şeyi halleder
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'admin'])->group(function () {
     Volt::route('/admin', 'admin.dashboard')->name('admin.dashboard');
     Volt::route('/admin/particles', 'admin.particles')->name('admin.particles');
     Volt::route('/admin/settings', 'admin.settings')->name('admin.settings');

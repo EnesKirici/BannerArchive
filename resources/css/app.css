@@ -38,11 +38,29 @@
     }
 }
 
+@layer components {
+    /* Sidebar collapsed state */
+    [data-sidebar-collapsed="true"] #sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        overflow: hidden;
+        border-right-width: 0 !important;
+    }
+
+    [data-sidebar-collapsed="true"] #sidebarToggle {
+        left: 0px !important;
+    }
+
+    [data-sidebar-collapsed="true"] #toggleArrow {
+        transform: rotate(180deg);
+    }
+}
+
 @layer utilities {
     .text-glow {
         text-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
     }
-    
+
     .box-glow {
         box-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
     }
@@ -50,7 +68,7 @@
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
     }
-    
+
     .scrollbar-hide {
         -ms-overflow-style: none;
         scrollbar-width: none;

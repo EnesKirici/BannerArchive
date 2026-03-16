@@ -277,10 +277,13 @@ class TMDBController extends Controller
         }
 
         if (empty($quotes)) {
-            return response()->json([
-                'error' => 'Sözler üretilemedi. Lütfen tekrar deneyin.',
-                'debug' => $service->getLastError(),
-            ], 500);
+            $response = ['error' => 'Sözler üretilemedi. Lütfen tekrar deneyin.'];
+
+            if (config('app.debug')) {
+                $response['debug'] = $service->getLastError();
+            }
+
+            return response()->json($response, 500);
         }
 
         return response()->json([

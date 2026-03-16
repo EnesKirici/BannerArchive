@@ -584,6 +584,11 @@ async function initGalleryParticles() {
         config.particles.number.density.enable = false;
     }
 
+    // Tab geçişlerinde container boyutu değişince particles yeniden çizilmesin
+    config.interactivity = config.interactivity || {};
+    config.interactivity.events = config.interactivity.events || {};
+    config.interactivity.events.resize = { enable: false };
+
     await tsParticles.load({
         id: "galleryParticles",
         options: config

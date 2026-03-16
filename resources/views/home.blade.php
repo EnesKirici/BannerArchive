@@ -3,7 +3,8 @@
 @section('title', 'BannerArchive')
 
 @section('content')
-<div class="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row font-sans overflow-hidden">
+@php $sidebarCollapsed = ($_COOKIE['sidebar_collapsed'] ?? '') === 'true'; @endphp
+<div class="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row font-sans overflow-hidden" data-sidebar-collapsed="{{ $sidebarCollapsed ? 'true' : 'false' }}">
 
     <!-- Mobile Header -->
     <div class="md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-neutral-900/95 backdrop-blur-md sticky top-0 z-40">
@@ -147,45 +148,12 @@
             </div>
         </div>
 
-        {{-- Popüler İçerikler --}}
-        @php
-            $trendingItems = collect($popularMovies)->merge($popularShows)->filter(fn($i) => !empty($i['backdrop_path']))->shuffle()->take(8);
-        @endphp
-        @if($trendingItems->isNotEmpty())
+        {{-- Keşfet - Kategori Tarayıcı --}}
         <div class="relative z-10 w-full max-w-[1920px] mx-auto px-4 md:px-12 pb-16 mt-8">
-            <div class="flex items-center gap-4 mb-6">
-                <h2 class="text-sm font-bold text-neutral-400 uppercase tracking-widest shrink-0">Günün Trendleri</h2>
-                <div class="flex-1 h-px bg-white/5"></div>
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                @foreach($trendingItems as $item)
-                    <a href="{{ route('gallery', ['type' => $item['raw_type'], 'id' => $item['id']]) }}"
-                       class="group relative aspect-video rounded-xl overflow-hidden bg-neutral-900 border border-white/5 hover:border-fuchsia-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(217,70,239,0.15)]">
-                        <img src="https://image.tmdb.org/t/p/w780{{ $item['backdrop_path'] }}"
-                             alt="{{ $item['title'] }}"
-                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                             loading="lazy">
-                        <div class="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent"></div>
-                        <div class="absolute bottom-0 left-0 right-0 p-3">
-                            <h3 class="text-white font-bold text-sm leading-tight truncate group-hover:text-fuchsia-400 transition-colors">{{ $item['title'] }}</h3>
-                            <div class="flex items-center gap-2 mt-1">
-                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-600/30 text-fuchsia-400 border border-fuchsia-600/20">{{ $item['type'] }}</span>
-                                @if($item['release_date'])
-                                    <span class="text-[10px] text-neutral-400">{{ \Carbon\Carbon::parse($item['release_date'])->format('Y') }}</span>
-                                @endif
-                                @if($item['vote_average'])
-                                    <span class="text-[10px] text-yellow-500 flex items-center gap-0.5">
-                                        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                                        {{ number_format($item['vote_average'], 1) }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    </a>
-                @endforeach
-            </div>
+            <livewire:category-browser />
         </div>
-        @endif
+
+        @include('partials.footer')
     </main>
 </div>
 

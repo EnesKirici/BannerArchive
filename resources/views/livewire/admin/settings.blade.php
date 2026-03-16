@@ -31,9 +31,7 @@ new #[Layout('admin.layout')] #[Title('Ayarlar')] class extends Component
     // Blade'de {{ $siteName }} veya wire:model="siteName" ile erişilir
     public string $siteName = '';
     public string $siteDescription = '';
-    public string $tmdbApiKey = '';
     public string $primaryColor = '#d946ef';
-    public string $geminiApiKey = '';
     public string $galleryViewMode = 'gallery';
     public string $particlesLayer = 'background';
 
@@ -43,9 +41,7 @@ new #[Layout('admin.layout')] #[Title('Ayarlar')] class extends Component
         // Veritabanından mevcut ayarları yükle
         $this->siteName = (string) Setting::get('site_name', 'BannerArchive');
         $this->siteDescription = (string) Setting::get('site_description', 'Film ve dizi banner arşivi');
-        $this->tmdbApiKey = (string) Setting::get('tmdb_api_key', '');
         $this->primaryColor = (string) Setting::get('primary_color', '#d946ef');
-        $this->geminiApiKey = (string) Setting::get('gemini_api_key', '');
         $this->galleryViewMode = (string) Setting::get('gallery_view_mode', 'gallery');
         $this->particlesLayer = (string) Setting::get('particles_layer', 'background');
     }
@@ -58,9 +54,7 @@ new #[Layout('admin.layout')] #[Title('Ayarlar')] class extends Component
         $this->validate([
             'siteName' => 'required|string|max:100',
             'siteDescription' => 'required|string|max:500',
-            'tmdbApiKey' => 'nullable|string|max:200',
             'primaryColor' => 'required|string|max:20',
-            'geminiApiKey' => 'nullable|string|max:200',
             'galleryViewMode' => 'required|in:modal,gallery,both',
             'particlesLayer' => 'required|in:overlay,background',
         ]);
@@ -68,9 +62,7 @@ new #[Layout('admin.layout')] #[Title('Ayarlar')] class extends Component
         // Veritabanına kaydet
         Setting::set('site_name', $this->siteName, 'string', 'general');
         Setting::set('site_description', $this->siteDescription, 'string', 'general');
-        Setting::set('tmdb_api_key', $this->tmdbApiKey, 'string', 'api');
         Setting::set('primary_color', $this->primaryColor, 'string', 'appearance');
-        Setting::set('gemini_api_key', $this->geminiApiKey, 'string', 'api');
         Setting::set('gallery_view_mode', $this->galleryViewMode, 'string', 'appearance');
         Setting::set('particles_layer', $this->particlesLayer, 'string', 'appearance');
 
@@ -148,31 +140,41 @@ new #[Layout('admin.layout')] #[Title('Ayarlar')] class extends Component
             </div>
         </div>
 
-        {{-- Sağ: API Ayarları --}}
+        {{-- Sağ: API Durumu (salt okunur) --}}
         <div class="bg-neutral-900 rounded-xl border border-white/5 p-6">
             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
                 <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                 </svg>
-                API Ayarları
+                API Durumu
             </h3>
 
             <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-neutral-300 mb-2">TMDB API Key</label>
-                    <input type="text" wire:model.blur="tmdbApiKey"
-                           class="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-fuchsia-500 font-mono text-sm transition-colors"
-                           placeholder="API anahtarınızı girin...">
-                    <p class="mt-1 text-xs text-neutral-500">TMDB'den ücretsiz API anahtarı alabilirsiniz</p>
+                <div class="flex items-center justify-between p-3 bg-neutral-800 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-neutral-300">TMDB API Key</p>
+                        <p class="text-xs text-neutral-500 mt-0.5">Film ve dizi verileri</p>
+                    </div>
+                    @if(config('services.tmdb.api_key'))
+                        <span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-medium rounded-md">Tanımlı</span>
+                    @else
+                        <span class="px-2.5 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded-md">Tanımsız</span>
+                    @endif
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-neutral-300 mb-2">Gemini API Key</label>
-                    <input type="text" wire:model.blur="geminiApiKey"
-                           class="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-fuchsia-500 font-mono text-sm transition-colors"
-                           placeholder="Gemini API anahtarınızı girin...">
-                    <p class="mt-1 text-xs text-neutral-500">AI söz üretimi için Google Gemini API anahtarı</p>
+                <div class="flex items-center justify-between p-3 bg-neutral-800 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-neutral-300">Gemini API Key</p>
+                        <p class="text-xs text-neutral-500 mt-0.5">AI söz üretimi</p>
+                    </div>
+                    @if(config('services.gemini.api_key'))
+                        <span class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-medium rounded-md">Tanımlı</span>
+                    @else
+                        <span class="px-2.5 py-1 bg-red-500/10 text-red-400 text-xs font-medium rounded-md">Tanımsız</span>
+                    @endif
                 </div>
+
+                <p class="text-xs text-neutral-600 mt-2">API anahtarları güvenlik nedeniyle yalnızca <code class="text-neutral-400">.env</code> dosyasından yönetilir.</p>
             </div>
         </div>
 

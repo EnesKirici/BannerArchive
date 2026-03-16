@@ -96,7 +96,9 @@ class QuoteGeneratorService
                 }
 
                 if (! $response->successful()) {
-                    $this->lastError = "Gemini API [{$model}] {$response->status()}: {$response->body()}";
+                    $this->lastError = config('app.debug')
+                        ? "Gemini API [{$model}] {$response->status()}: {$response->body()}"
+                        : "Gemini API [{$model}] hata kodu: {$response->status()}";
 
                     if ($attempt < $maxAttempts) {
                         sleep(2);

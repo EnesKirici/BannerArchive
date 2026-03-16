@@ -277,6 +277,8 @@
                 @endif
             </div>
         </div>
+
+        @include('partials.footer')
     </div>
 
     {{-- Actor Modal --}}
