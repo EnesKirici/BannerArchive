@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'BannerArchive')
+@section('title', 'elw - BannerArchive')
 
 @section('content')
 @php $sidebarCollapsed = ($_COOKIE['sidebar_collapsed'] ?? '') === 'true'; @endphp
@@ -9,7 +9,7 @@
     <!-- Mobile Header -->
     <div class="md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-neutral-900/95 backdrop-blur-md sticky top-0 z-40">
         <div class="flex items-center gap-2">
-            <div class="w-6 h-6 flex items-center justify-center rounded bg-linear-to-br from-fuchsia-600 to-purple-700 font-bold text-xs">B</div>
+            <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-7 h-7 rounded elw-logo-hover">
             <span class="font-bold tracking-tight">BannerArchive</span>
         </div>
         <button onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full')" class="cursor-pointer text-white p-2">
@@ -28,9 +28,7 @@
         <!-- Sidebar Header -->
         <div class="p-6 pb-4 hidden md:block shrink-0 bg-neutral-900 z-20">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 flex items-center justify-center rounded-lg bg-linear-to-br from-fuchsia-600 to-purple-700 shadow-[0_0_15px_rgba(217,70,239,0.3)]">
-                    <span class="font-bold text-white">B</span>
-                </div>
+                <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-9 h-9 rounded-lg elw-logo-animated elw-logo-hover">
                 <h2 class="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-neutral-400 tracking-tight">BannerArchive</h2>
             </div>
         </div>

@@ -53,6 +53,12 @@ new #[Layout('admin.layout')] #[Title('Giriş Geçmişi')] class extends Compone
         $this->resetPage();
     }
 
+    public function updatedPerPage(): void
+    {
+        $this->perPage = min(max($this->perPage, 5), 100);
+        $this->resetPage();
+    }
+
     public function clearFilters(): void
     {
         $this->search = '';

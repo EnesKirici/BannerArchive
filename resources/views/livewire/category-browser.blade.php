@@ -152,14 +152,14 @@ new class extends Component
         @endforeach
     </div>
 
-    {{-- Loading --}}
-    <div wire:loading wire:target="setCategory, setMediaType" class="py-12 text-center">
-        <div class="inline-block w-8 h-8 border-[3px] border-neutral-800 border-t-fuchsia-500 rounded-full animate-spin"></div>
-    </div>
+    {{-- Results Grid with Loading Overlay --}}
+    <div class="relative min-h-[300px]">
+        {{-- Loading Overlay --}}
+        <div wire:loading.flex wire:target="setCategory, setMediaType" class="absolute inset-0 z-10 items-center justify-center hidden">
+            <div class="inline-block w-8 h-8 border-[3px] border-neutral-800 border-t-fuchsia-500 rounded-full animate-spin"></div>
+        </div>
 
-    {{-- Results Grid --}}
-    <div wire:loading.remove wire:target="setCategory, setMediaType"
-         class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div wire:loading.class="opacity-30 pointer-events-none" wire:target="setCategory, setMediaType" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 transition-opacity duration-300">
         @foreach ($items as $item)
             <a href="{{ route('gallery', ['type' => $item['raw_type'], 'id' => $item['id']]) }}"
                wire:key="cat-{{ $item['id'] }}"
@@ -193,4 +193,5 @@ new class extends Component
             <p class="text-neutral-500">Bu kategoride içerik bulunamadı.</p>
         </div>
     @endif
+    </div>
 </div>

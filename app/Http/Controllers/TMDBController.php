@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\GenerateQuotesRequest;
+use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Services\QuoteGeneratorService;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,7 @@ class TMDBController extends Controller
         $this->baseUrl = config('services.tmdb.base_url');
     }
 
-    public function gallery(string $type, int $id): View
+    public function gallery(Request $request, string $type, int $id): View
     {
         $apiKey = config('services.tmdb.api_key');
 
@@ -76,6 +77,11 @@ class TMDBController extends Controller
 
         $particlesLayer = (string) Setting::get('particles_layer', 'background');
 
+        ActivityLog::log($request, 'gallery', $movie['title'], [
+            'type' => $type,
+            'tmdb_id' => $id,
+        ]);
+
         return view('gallery', compact('movie', 'images', 'credits', 'watchProviders', 'videos', 'particlesLayer'));
     }
 
@@ -117,6 +123,8 @@ class TMDBController extends Controller
         if (! $query) {
             return response()->json(['results' => []]);
         }
+
+        ActivityLog::log($request, 'search', $query);
 
         $cacheKey = 'tmdb_search_'.md5($query);
 
@@ -231,6 +239,10 @@ class TMDBController extends Controller
         $path = $request->input('path');
         $size = $request->input('size', 'original');
 
+        ActivityLog::log($request, 'download', $path ?? '', [
+            'size' => $size,
+        ]);
+
         if (! $path || ! preg_match('/^\/[a-zA-Z0-9_]+\.\w+$/', $path)) {
             abort(400, 'Geçersiz dosya yolu');
         }
@@ -256,6 +268,11 @@ class TMDBController extends Controller
         $id = $request->integer('id');
         $type = $request->string('type');
         $title = $request->string('title');
+
+        ActivityLog::log($request, 'quote', (string) $title, [
+            'type' => (string) $type,
+            'tmdb_id' => $id,
+        ]);
         $overview = $request->string('overview');
         $style = $request->string('style', '');
         $regenerate = $request->boolean('regenerate', false);

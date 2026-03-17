@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\LoginRequest;
+use App\Models\BlockedIp;
 use App\Models\LoginHistory;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -54,10 +55,22 @@ class AuthController extends Controller
             $attempts = (int) Cache::get($attemptsKey, 0) + 1;
             Cache::put($attemptsKey, $attempts, now()->addMinutes(15));
 
+            if ($attempts >= 10) {
+                BlockedIp::updateOrCreate(
+                    ['ip_address' => $ip],
+                    ['reason' => "Brute force: {$attempts} başarısız giriş denemesi", 'blocked_until' => null]
+                );
+                Cache::forget("blocked_ip_{$ip}");
+                Cache::forget($attemptsKey);
+
+                throw ValidationException::withMessages([
+                    'email' => ['IP adresiniz kalıcı olarak engellenmiştir.'],
+                ]);
+            }
+
             if ($attempts >= 5) {
                 $lockoutSeconds = min(60 * $attempts, 900);
                 Cache::put($lockoutKey, time() + $lockoutSeconds, $lockoutSeconds);
-                Cache::forget($attemptsKey);
 
                 throw ValidationException::withMessages([
                     'email' => ["Çok fazla başarısız deneme. {$lockoutSeconds} saniye boyunca kilitlendiniz."],

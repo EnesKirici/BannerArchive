@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
-    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
-    <title>{{ $title ?? 'Admin Panel' }} - BannerArchive</title>
+    <link rel="icon" type="image/jpeg" href="{{ asset('images/elw.jpg') }}">
+    <link rel="apple-touch-icon" href="{{ asset('images/elw.jpg') }}">
+    <title>{{ $title ?? 'Admin Panel' }} - elw</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -20,9 +20,7 @@
         <aside class="w-64 bg-neutral-900 border-r border-white/5 flex flex-col">
             <div class="p-6 border-b border-white/5">
                 <a href="{{ route('home') }}" class="flex items-center gap-3">
-                    <div class="w-8 h-8 flex items-center justify-center rounded-lg bg-linear-to-br from-fuchsia-600 to-purple-700">
-                        <span class="font-bold text-white text-sm">B</span>
-                    </div>
+                    <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-8 h-8 rounded-lg">
                     <span class="text-lg font-bold">BannerArchive</span>
                 </a>
             </div>
@@ -73,6 +71,22 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
                     </svg>
                     Cache Yönetimi
+                </a>
+
+                <a href="{{ route('admin.activity-logs') }}" wire:navigate
+                   class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all {{ request()->routeIs('admin.activity-logs') ? 'bg-fuchsia-600 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                    Aktivite Logları
+                </a>
+
+                <a href="{{ route('admin.blocked-ips') }}" wire:navigate
+                   class="flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all {{ request()->routeIs('admin.blocked-ips') ? 'bg-red-600 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                    </svg>
+                    Engelli IP'ler
                 </a>
             </nav>
 

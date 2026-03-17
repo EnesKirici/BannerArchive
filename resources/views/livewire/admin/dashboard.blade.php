@@ -10,6 +10,7 @@
  *    döngüsünde cache'lenir (aynı property'e 2 kez erişirsen 1 kez SQL çalışır)
  */
 
+use App\Models\BlockedIp;
 use App\Models\LoginHistory;
 use App\Models\ParticleTheme;
 use App\Models\Setting;
@@ -34,6 +35,11 @@ new #[Layout('admin.layout')] #[Title('Dashboard')] class extends Component
             'total_settings' => Setting::count(),
             'last_login' => LoginHistory::where('success', true)->latest()->first(),
             'cache_driver' => config('cache.default'),
+            'blocked_ips' => BlockedIp::count(),
+            'recent_failed_ips' => LoginHistory::where('success', false)
+                ->where('created_at', '>=', now()->subDay())
+                ->distinct('ip_address')
+                ->count('ip_address'),
         ];
     }
 
@@ -112,6 +118,24 @@ new #[Layout('admin.layout')] #[Title('Dashboard')] class extends Component
         </div>
     </div>
 
+    {{-- Brute Force Uyarısı --}}
+    @if($this->stats['recent_failed_ips'] > 0)
+    <div class="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/5 flex items-center gap-4">
+        <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+        </div>
+        <div class="flex-1">
+            <p class="font-semibold text-red-400">Brute Force Uyarısı</p>
+            <p class="text-sm text-neutral-400">Son 24 saatte <span class="text-red-400 font-bold">{{ $this->stats['recent_failed_ips'] }}</span> farklı IP adresinden başarısız giriş denemesi yapıldı.</p>
+        </div>
+        <a href="{{ route('admin.login-history') }}?filter=failed" class="text-sm text-red-400 hover:text-red-300 transition-colors shrink-0">
+            Detaylar →
+        </a>
+    </div>
+    @endif
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {{-- Sistem Bilgisi --}}
         <div class="bg-neutral-900 rounded-xl border border-white/5 p-6">
@@ -188,7 +212,7 @@ new #[Layout('admin.layout')] #[Title('Dashboard')] class extends Component
     </div>
 
     {{-- Hızlı Eylemler --}}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <a href="{{ route('admin.particles') }}" class="block bg-neutral-900 rounded-xl border border-white/5 p-6 hover:border-fuchsia-500/50 transition-colors group">
             <div class="flex items-center gap-4">
                 <div class="w-12 h-12 rounded-lg bg-fuchsia-500/10 flex items-center justify-center group-hover:bg-fuchsia-500/20 transition-colors">
@@ -214,6 +238,20 @@ new #[Layout('admin.layout')] #[Title('Dashboard')] class extends Component
                 <div>
                     <h3 class="font-semibold group-hover:text-purple-400 transition-colors">Ayarlar</h3>
                     <p class="text-sm text-neutral-500">Site ayarlarını yönet</p>
+                </div>
+            </div>
+        </a>
+
+        <a href="{{ route('admin.blocked-ips') }}" wire:navigate class="block bg-neutral-900 rounded-xl border border-white/5 p-6 hover:border-red-500/50 transition-colors group">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-lg bg-red-500/10 flex items-center justify-center group-hover:bg-red-500/20 transition-colors">
+                    <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="font-semibold group-hover:text-red-400 transition-colors">Engelli IP'ler</h3>
+                    <p class="text-sm text-neutral-500">{{ $this->stats['blocked_ips'] }} engelli IP</p>
                 </div>
             </div>
         </a>

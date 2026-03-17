@@ -8,12 +8,12 @@ use Livewire\Volt\Volt;
 
 // Public Routes
 Route::get('/', [TMDBController::class, 'index'])->name('home');
-Route::get('/search', [TMDBController::class, 'search'])->name('search')->middleware('throttle:30,1');
-Route::get('/images/{type}/{id}', [TMDBController::class, 'images'])->name('images')->middleware('throttle:60,1');
-Route::get('/proxy-image', [TMDBController::class, 'proxyImage'])->name('proxy.image')->middleware('throttle:120,1');
-Route::get('/gallery/{type}/{id}', [TMDBController::class, 'gallery'])->name('gallery')->where(['type' => 'movie|tv', 'id' => '[0-9]+'])->middleware('throttle:60,1');
-Route::post('/generate-quotes', [TMDBController::class, 'generateQuotes'])->name('generate.quotes')->middleware('throttle:10,1');
-Route::get('/person/{id}/credits', [TMDBController::class, 'personCredits'])->name('person.credits')->where('id', '[0-9]+')->middleware('throttle:60,1');
+Route::get('/search', [TMDBController::class, 'search'])->name('search')->middleware('throttle:search');
+Route::get('/images/{type}/{id}', [TMDBController::class, 'images'])->name('images')->middleware('throttle:browse');
+Route::get('/proxy-image', [TMDBController::class, 'proxyImage'])->name('proxy.image')->middleware('throttle:download');
+Route::get('/gallery/{type}/{id}', [TMDBController::class, 'gallery'])->name('gallery')->where(['type' => 'movie|tv', 'id' => '[0-9]+'])->middleware('throttle:browse');
+Route::post('/generate-quotes', [TMDBController::class, 'generateQuotes'])->name('generate.quotes')->middleware('throttle:quotes');
+Route::get('/person/{id}/credits', [TMDBController::class, 'personCredits'])->name('person.credits')->where('id', '[0-9]+')->middleware('throttle:browse');
 
 // Particles API (public - for frontend)
 Route::get('/api/particles/config', [AdminController::class, 'getActiveThemeConfig'])->name('api.particles.config')->middleware('throttle:60,1');
@@ -31,4 +31,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Volt::route('/admin/settings', 'admin.settings')->name('admin.settings');
     Volt::route('/admin/login-history', 'admin.login-history')->name('admin.login-history');
     Volt::route('/admin/cache', 'admin.cache-manager')->name('admin.cache');
+    Volt::route('/admin/blocked-ips', 'admin.blocked-ips')->name('admin.blocked-ips');
+    Volt::route('/admin/activity-logs', 'admin.activity-logs')->name('admin.activity-logs');
 });
