@@ -31,7 +31,7 @@
                     Aramaya Dön
                 </a>
                 <h1 class="text-3xl md:text-5xl font-black tracking-tight text-white mb-3">{{ $movie['title'] }}</h1>
-                <div class="flex items-center gap-4 text-sm text-neutral-300">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 sm:gap-x-4 text-sm text-neutral-300">
                     <span class="px-3 py-1 rounded-full bg-fuchsia-600/20 text-fuchsia-400 text-sm font-bold border border-fuchsia-600/30">{{ $movie['type'] }}</span>
                     @if($movie['release_date'])
                         <span class="text-base font-medium">{{ \Carbon\Carbon::parse($movie['release_date'])->format('Y') }}</span>
@@ -123,7 +123,7 @@
             ];
             $firstTab = collect($tabData)->filter(fn($v) => $v[1] > 0)->keys()->first() ?? 'backdrops';
         @endphp
-        <div id="galleryTabs" class="flex items-center gap-2 mb-5">
+        <div id="galleryTabs" class="flex items-center gap-2 mb-5 overflow-x-auto scrollbar-hide -mx-6 px-6 md:mx-0 md:px-0 md:overflow-visible">
             @foreach($tabData as $key => [$label, $count])
                 @if($count > 0)
                     <button data-tab="{{ $key }}"
@@ -135,9 +135,9 @@
         </div>
 
         {{-- Controls Bar --}}
-        <div id="controlsBar" class="flex flex-wrap items-center gap-4 mb-6 p-4 bg-neutral-900/80 backdrop-blur-sm rounded-xl border border-white/5">
+        <div id="controlsBar" class="flex flex-wrap items-center gap-x-4 gap-y-3 mb-6 p-3 sm:p-4 bg-neutral-900/80 backdrop-blur-sm rounded-xl border border-white/5">
             {{-- Resolution --}}
-            <div id="sizeButtons" class="flex items-center gap-2">
+            <div id="sizeButtons" class="flex items-center gap-2 overflow-x-auto scrollbar-hide max-w-full">
                 <span class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Çözünürlük:</span>
                 {{-- JS tarafindan doldurulacak --}}
             </div>
@@ -153,7 +153,7 @@
             </div>
 
             {{-- Bulk Actions --}}
-            <div class="flex items-center gap-3 ml-auto">
+            <div class="flex items-center gap-3 ml-auto w-full sm:w-auto mt-2 sm:mt-0">
                 <button id="selectAllBtn" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-neutral-800 text-neutral-400 hover:bg-neutral-700 border border-white/5">
                     Tümünü Seç
                 </button>
@@ -181,6 +181,7 @@
                         <div id="grid-{{ $tabKey }}" class="gallery-grid pb-12 {{ $tabKey !== $firstTab ? 'hidden' : '' }}">
                             <div class="grid gap-4 {{ $tabKey === 'posters' ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4' }}">
                                 @foreach($images[$tabKey] as $index => $img)
+                                    @if($index >= 20) @break @endif
                                     <div class="gallery-item group relative bg-neutral-900 rounded-xl overflow-hidden border-2 border-transparent hover:border-white/20 transition-all cursor-pointer"
                                          data-tab="{{ $tabKey }}"
                                          data-index="{{ $index }}"
@@ -217,6 +218,9 @@
                                     </div>
                                 @endforeach
                             </div>
+                            @if(count($images[$tabKey]) > 20)
+                                <div class="lazy-load-sentinel h-px" data-tab="{{ $tabKey }}" data-loaded="20"></div>
+                            @endif
                         </div>
                     @endif
                 @endforeach
@@ -358,7 +362,7 @@
         <div class="absolute inset-0 flex flex-col items-center justify-center p-4" id="lightboxBackdrop">
             <img id="lightboxImage" src="" alt="Preview" class="max-w-[90vw] max-h-[75vh] object-contain rounded-lg">
 
-            <div class="mt-4 flex items-center gap-4 bg-neutral-900/90 backdrop-blur-sm px-6 py-3 rounded-full border border-white/10">
+            <div class="mt-4 flex items-center gap-2 sm:gap-4 bg-neutral-900/90 backdrop-blur-sm px-3 py-2 sm:px-6 sm:py-3 flex-wrap justify-center rounded-2xl sm:rounded-full max-w-[95vw] border border-white/10">
                 <span id="lightboxDims" class="text-xs font-mono text-fuchsia-400">...</span>
                 <span id="lightboxCounter" class="text-xs text-neutral-500">1 / 22</span>
                 <button id="lightboxDownload" class="flex items-center gap-2 px-4 py-1.5 bg-white text-black font-bold rounded-full text-xs hover:bg-fuchsia-500 hover:text-white transition-colors">

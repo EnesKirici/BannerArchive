@@ -15,6 +15,7 @@ import { loadSlim } from "@tsparticles/slim";
 import JSZip from "jszip";
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/';
+const LAZY_BATCH_SIZE = 20;
 
 const IMAGE_SIZES = {
     backdrop: ['w300', 'w780', 'w1280', 'w1920', 'original'],
@@ -135,65 +136,7 @@ function initGallery() {
     });
 
     // ═══ GRID ITEM EVENTS ═══
-    els.items.forEach(item => {
-        // Image click → Ctrl+Click secim, normal click lightbox
-        item.addEventListener('click', (e) => {
-            // Checkbox veya download butonuna tiklandiysa islem yapma
-            if (e.target.closest('.gallery-checkbox') || e.target.closest('.download-single-btn')) return;
-
-            const tab = item.dataset.tab;
-            const index = parseInt(item.dataset.index);
-
-            if (tab !== state.activeTab) return;
-
-            // Ctrl+Click (veya Cmd+Click) → secim toggle
-            if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                const fp = item.dataset.filePath;
-                const checkbox = item.querySelector('.gallery-check-input');
-                const isSelected = state.selectedItems.has(fp);
-
-                if (isSelected) {
-                    state.selectedItems.delete(fp);
-                    if (checkbox) checkbox.checked = false;
-                    updateItemCheckUI(item, false);
-                } else {
-                    state.selectedItems.add(fp);
-                    if (checkbox) checkbox.checked = true;
-                    updateItemCheckUI(item, true);
-                }
-                updateSelectionUI();
-                return;
-            }
-
-            // Normal click → lightbox
-            openLightbox(index);
-        });
-
-        // Checkbox
-        const checkbox = item.querySelector('.gallery-check-input');
-        if (checkbox) {
-            checkbox.addEventListener('change', () => {
-                const fp = item.dataset.filePath;
-                if (checkbox.checked) {
-                    state.selectedItems.add(fp);
-                } else {
-                    state.selectedItems.delete(fp);
-                }
-                updateItemCheckUI(item, checkbox.checked);
-                updateSelectionUI();
-            });
-        }
-
-        // Download single button
-        const dlBtn = item.querySelector('.download-single-btn');
-        if (dlBtn) {
-            dlBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                downloadSingle(item.dataset.filePath, state.selectedSize);
-            });
-        }
-    });
+    els.items.forEach(item => bindItemEvents(item));
 
     // ═══ SELECT ALL ═══
     els.selectAllBtn.addEventListener('click', () => {
@@ -307,8 +250,8 @@ function updateFormatUI() {
         btn.className = `format-btn px-2.5 py-1 rounded text-[11px] font-mono font-bold transition-all uppercase ${isActive ? 'bg-fuchsia-600 text-white' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 border border-white/5'}`;
     });
 
-    // Update all format labels in grid items
-    els.formatLabels.forEach(lbl => {
+    // Update all format labels in grid items (re-query for lazy-loaded items)
+    document.querySelectorAll('.format-label').forEach(lbl => {
         lbl.textContent = state.selectedFormat.toUpperCase();
     });
 
@@ -366,6 +309,145 @@ function getCurrentTabItems() {
 
 function getCurrentTabImages() {
     return window.GALLERY_IMAGES?.[state.activeTab] || [];
+}
+
+// ═══ ITEM EVENT BINDING ═══
+
+function bindItemEvents(item) {
+    if (item.dataset.bound) return;
+    item.dataset.bound = '1';
+
+    item.addEventListener('click', (e) => {
+        if (e.target.closest('.gallery-checkbox') || e.target.closest('.download-single-btn')) return;
+        const tab = item.dataset.tab;
+        const index = parseInt(item.dataset.index);
+        if (tab !== state.activeTab) return;
+
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const fp = item.dataset.filePath;
+            const checkbox = item.querySelector('.gallery-check-input');
+            const isSelected = state.selectedItems.has(fp);
+            if (isSelected) {
+                state.selectedItems.delete(fp);
+                if (checkbox) checkbox.checked = false;
+                updateItemCheckUI(item, false);
+            } else {
+                state.selectedItems.add(fp);
+                if (checkbox) checkbox.checked = true;
+                updateItemCheckUI(item, true);
+            }
+            updateSelectionUI();
+            return;
+        }
+
+        openLightbox(index);
+    });
+
+    const checkbox = item.querySelector('.gallery-check-input');
+    if (checkbox) {
+        checkbox.addEventListener('change', () => {
+            const fp = item.dataset.filePath;
+            if (checkbox.checked) {
+                state.selectedItems.add(fp);
+            } else {
+                state.selectedItems.delete(fp);
+            }
+            updateItemCheckUI(item, checkbox.checked);
+            updateSelectionUI();
+        });
+    }
+
+    const dlBtn = item.querySelector('.download-single-btn');
+    if (dlBtn) {
+        dlBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            downloadSingle(item.dataset.filePath, state.selectedSize);
+        });
+    }
+}
+
+// ═══ LAZY LOADING ═══
+
+function createGalleryItem(img, index, tab) {
+    const thumbSize = tab === 'posters' ? 'w342' : 'w780';
+    const aspectClass = tab === 'posters' ? 'aspect-2/3' : 'aspect-video';
+
+    const div = document.createElement('div');
+    div.className = 'gallery-item group relative bg-neutral-900 rounded-xl overflow-hidden border-2 border-transparent hover:border-white/20 transition-all cursor-pointer';
+    div.dataset.tab = tab;
+    div.dataset.index = String(index);
+    div.dataset.filePath = img.file_path;
+    div.dataset.width = String(img.width);
+    div.dataset.height = String(img.height);
+
+    div.innerHTML = `
+        <div class="absolute top-2 left-2 z-10">
+            <label class="gallery-checkbox flex items-center justify-center w-6 h-6 rounded-md transition-all cursor-pointer bg-black/50 backdrop-blur-sm border border-white/20 hover:border-fuchsia-500">
+                <input type="checkbox" class="hidden gallery-check-input">
+                <svg class="w-4 h-4 text-white hidden check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                </svg>
+            </label>
+        </div>
+        <div class="${aspectClass}">
+            <img src="${TMDB_IMAGE_BASE}${thumbSize}${img.file_path}"
+                 alt="Görsel ${index + 1}"
+                 class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                 loading="lazy">
+        </div>
+        <div class="flex items-center justify-between px-3 py-2 bg-neutral-900">
+            <span class="text-[10px] font-mono text-neutral-500">${img.width}x${img.height}</span>
+            <button class="download-single-btn flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold bg-neutral-800 text-neutral-400 hover:bg-fuchsia-600 hover:text-white transition-all">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span class="format-label">${state.selectedFormat.toUpperCase()}</span>
+            </button>
+        </div>`;
+
+    return div;
+}
+
+function initLazyLoading() {
+    const sentinels = document.querySelectorAll('.lazy-load-sentinel');
+    if (!sentinels.length) return;
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+
+            const sentinel = entry.target;
+            const tab = sentinel.dataset.tab;
+            const loaded = parseInt(sentinel.dataset.loaded) || 0;
+            const allImages = window.GALLERY_IMAGES?.[tab] || [];
+
+            if (loaded >= allImages.length) {
+                observer.unobserve(sentinel);
+                sentinel.remove();
+                return;
+            }
+
+            const grid = sentinel.previousElementSibling;
+            const nextBatch = allImages.slice(loaded, loaded + LAZY_BATCH_SIZE);
+
+            nextBatch.forEach((img, i) => {
+                const item = createGalleryItem(img, loaded + i, tab);
+                grid.appendChild(item);
+                bindItemEvents(item);
+            });
+
+            sentinel.dataset.loaded = String(loaded + nextBatch.length);
+            els.items = document.querySelectorAll('.gallery-item');
+
+            if (loaded + nextBatch.length >= allImages.length) {
+                observer.unobserve(sentinel);
+                sentinel.remove();
+            }
+        });
+    }, {
+        rootMargin: '200px'
+    });
+
+    sentinels.forEach(sentinel => observer.observe(sentinel));
 }
 
 // ═══ LIGHTBOX ═══
@@ -764,8 +846,8 @@ function renderActorContent(data) {
 
     return `
         <div class="p-6">
-            <div class="flex gap-5 mb-6">
-                <div class="w-28 h-40 rounded-xl overflow-hidden shrink-0 border border-white/10">${profileImg}</div>
+            <div class="flex flex-col sm:flex-row gap-4 sm:gap-5 mb-6">
+                <div class="w-20 h-28 sm:w-28 sm:h-40 rounded-xl overflow-hidden shrink-0 border border-white/10 mx-auto sm:mx-0">${profileImg}</div>
                 <div class="flex-1 min-w-0">
                     <h2 class="text-2xl font-black text-white">${data.name}</h2>
                     ${meta.length ? `<p class="text-sm text-neutral-400 mt-1">${meta.join(' &middot; ')}</p>` : ''}
@@ -774,7 +856,7 @@ function renderActorContent(data) {
             </div>
             <div class="border-t border-white/5 pt-5">
                 <h3 class="text-xs uppercase tracking-widest text-neutral-500 font-bold mb-4">Filmografi <span class="text-neutral-600">(${data.credits.length})</span></h3>
-                <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
                     ${credits}
                 </div>
             </div>
@@ -784,5 +866,6 @@ function renderActorContent(data) {
 // ═══ INIT ═══
 document.addEventListener('DOMContentLoaded', () => {
     initGallery();
+    initLazyLoading();
     initGalleryParticles();
 });
