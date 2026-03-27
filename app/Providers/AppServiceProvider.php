@@ -61,5 +61,12 @@ class AppServiceProvider extends ServiceProvider
                 ? Limit::perMinute(15)->by($request->user()->id)
                 : Limit::perMinute(3)->by($request->ip());
         });
+
+        // Resim dönüştürme: guest 10/dk, auth 30/dk
+        RateLimiter::for('image-convert', function (Request $request) {
+            return $request->user()
+                ? Limit::perMinute(30)->by($request->user()->id)
+                : Limit::perMinute(10)->by($request->ip());
+        });
     }
 }

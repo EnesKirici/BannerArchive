@@ -22,6 +22,10 @@
                 <li>
                     <a href="{{ route('home') }}#" onclick="document.querySelector('[wire\\:model\\.live\\.debounce\\.500ms]')?.focus(); return false;" class="text-sm text-neutral-500 hover:text-fuchsia-400 transition-colors duration-300">Film Ara</a>
                 </li>
+                <li class="text-neutral-700">|</li>
+                <li>
+                    <a href="{{ route('tools.image-converter') }}" class="text-sm text-neutral-500 hover:text-fuchsia-400 transition-colors duration-300">Resim Dönüştürücü</a>
+                </li>
             </ul>
 
         </div>

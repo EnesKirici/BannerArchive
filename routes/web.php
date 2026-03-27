@@ -18,6 +18,9 @@ Route::get('/person/{id}/credits', [TMDBController::class, 'personCredits'])->na
 // Particles API (public - for frontend)
 Route::get('/api/particles/config', [AdminController::class, 'getActiveThemeConfig'])->name('api.particles.config')->middleware('throttle:60,1');
 
+// Tools (Public)
+Volt::route('/tools/image-converter', 'image-converter')->name('tools.image-converter');
+
 // Auth Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
