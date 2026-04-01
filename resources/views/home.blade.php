@@ -18,7 +18,7 @@
     </div>
 
     <!-- Sidebar Toggle Button (Desktop) -->
-    <button id="sidebarToggle" class="cursor-pointer hidden md:flex fixed left-80 top-1/2 -translate-y-1/2 z-50 w-6 h-14 items-center justify-center bg-neutral-800/90 border border-white/10 rounded-r-lg hover:bg-fuchsia-600 transition-all duration-300 text-neutral-400 hover:text-white backdrop-blur-sm">
+    <button id="sidebarToggle" aria-label="Kenar çubuğunu aç/kapat" class="cursor-pointer hidden md:flex fixed left-80 top-1/2 -translate-y-1/2 z-50 w-6 h-14 items-center justify-center bg-neutral-800/90 border border-white/10 rounded-r-lg hover:bg-fuchsia-600 transition-all duration-300 text-neutral-400 hover:text-white backdrop-blur-sm">
         <svg id="toggleArrow" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
     </button>
 
