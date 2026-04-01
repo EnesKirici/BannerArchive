@@ -4,44 +4,35 @@
  */
 
 function createBat(container, index, config) {
+    // Wrapper: pozisyon kontrolü
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position: absolute; will-change: left, top;';
+
+    // Bat sprite: box-shadow ~30px merkez etrafında çiziliyor
+    // transform-origin'i sprite merkezine ayarlıyoruz ki flip doğal görünsün
     const bat = document.createElement('div');
     bat.className = 'bat';
-
-    const scale = config.scale;
+    const s = config.scale;
     const opacity = 0.4 + Math.random() * 0.4;
-    const baseSpeed = 60 / config.speed; // px per frame (düşük speed değeri = hızlı)
+    bat.style.cssText = `
+        transform: scale(${s});
+        transform-origin: 30px 25px;
+        animation: ${config.flapSpeed}s bat steps(1) infinite;
+        opacity: ${opacity};
+    `;
+    wrapper.appendChild(bat);
 
-    // Rastgele başlangıç pozisyonu (ekran içinde)
-    let x = Math.random() * 80 + 10; // %10-%90 arası
+    const baseSpeed = 60 / config.speed;
+    let x = Math.random() * 80 + 10;
     let y = Math.random() * 70 + 10;
-
-    // Rastgele yön (açı)
     let angle = Math.random() * Math.PI * 2;
     let speedMultiplier = 0.7 + Math.random() * 0.6;
+    let facingRight = Math.cos(angle) > 0;
 
-    bat.style.cssText = `
-        position: absolute;
-        transform: scale(${scale});
-        opacity: ${opacity};
-        animation: ${config.flapSpeed}s bat steps(1) infinite;
-        will-change: left, top;
-    `;
+    wrapper.style.left = x + '%';
+    wrapper.style.top = y + '%';
+    bat.style.transform = `scale(${facingRight ? -s : s}, ${s})`;
 
-    bat.style.left = x + '%';
-    bat.style.top = y + '%';
-
-    // Sola gidiyorsa normal, sağa gidiyorsa flip
-    function updateDirection() {
-        const vx = Math.cos(angle);
-        if (vx > 0) {
-            bat.style.transform = `scale(${scale}) scaleX(-1)`;
-        } else {
-            bat.style.transform = `scale(${scale})`;
-        }
-    }
-    updateDirection();
-
-    // Animasyon frame'i
     function animate() {
         const vx = Math.cos(angle) * baseSpeed * speedMultiplier;
         const vy = Math.sin(angle) * baseSpeed * speedMultiplier;
@@ -50,29 +41,29 @@ function createBat(container, index, config) {
         y += vy * 0.05;
 
         // Sınır kontrolü — kenara gelince yön değiştir
-        let bounced = false;
-        if (x < 2) { angle = Math.PI - angle; x = 2; bounced = true; }
-        if (x > 95) { angle = Math.PI - angle; x = 95; bounced = true; }
-        if (y < 2) { angle = -angle; y = 2; bounced = true; }
-        if (y > 85) { angle = -angle; y = 85; bounced = true; }
+        if (x < 2) { angle = Math.PI - angle; x = 2; }
+        if (x > 95) { angle = Math.PI - angle; x = 95; }
+        if (y < 2) { angle = -angle; y = 2; }
+        if (y > 85) { angle = -angle; y = 85; }
 
-        // Küçük rastgele sapma (doğal hareket)
-        if (!bounced) {
-            angle += (Math.random() - 0.5) * 0.05;
+        // Küçük rastgele sapma
+        angle += (Math.random() - 0.5) * 0.03;
+
+        // Yön sadece değişince güncelle
+        const nowRight = Math.cos(angle) > 0;
+        if (nowRight !== facingRight) {
+            facingRight = nowRight;
+            bat.style.transform = `scale(${facingRight ? -s : s}, ${s})`;
         }
 
-        if (bounced) {
-            updateDirection();
-        }
-
-        bat.style.left = x + '%';
-        bat.style.top = y + '%';
+        wrapper.style.left = x + '%';
+        wrapper.style.top = y + '%';
 
         requestAnimationFrame(animate);
     }
 
     requestAnimationFrame(animate);
-    return bat;
+    return wrapper;
 }
 
 export async function initBatAnimation() {

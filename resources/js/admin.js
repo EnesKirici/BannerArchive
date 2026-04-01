@@ -166,3 +166,77 @@ window.particlePreview = function (cfg) {
         }
     };
 };
+
+/**
+ * Spider Preview — Küçük canvas önizlemesi (admin card)
+ */
+window.spiderPreview = function (color) {
+    return {
+        raf: null,
+        init() {
+            const canvas = this.$refs.spiderCanvas;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.offsetWidth;
+            const h = canvas.offsetHeight;
+            canvas.width = w * 2;
+            canvas.height = h * 2;
+            ctx.scale(2, 2);
+
+            const { sin, cos, PI, hypot, min, max } = Math;
+            const rnd = (x = 1, d = 0) => Math.random() * x + d;
+            const lerp = (a, b, t) => a + (b - a) * t;
+            const noise = (x, y, t = 101) => {
+                return sin(0.3*x+1.4*t+2+2.5*sin(0.4*y-1.3*t+1)) + sin(0.2*y+1.5*t+2.8+2.3*sin(0.5*x-1.2*t+0.5));
+            };
+
+            // Mini spider
+            const pts = Array.from({length: 80}, () => ({ x: rnd(w), y: rnd(h), len: 0, r: 0 }));
+            const legs = Array.from({length: 9}, (_, i) => ({ x: cos(i/9*PI*2), y: sin(i/9*PI*2) }));
+            let cx = w/2, cy = h/2, tx = w/2, ty = h/2;
+            const seed = rnd(100), kx = rnd(0.5,0.5), ky = rnd(0.5,0.5);
+            const wr = { x: rnd(15,15), y: rnd(15,15) };
+            const r = w / rnd(30, 40);
+
+            const self = this;
+            function draw(t) {
+                t /= 1000;
+                ctx.clearRect(0, 0, w, h);
+                ctx.fillStyle = ctx.strokeStyle = color;
+
+                tx = w/2 + cos(t*0.5)*w*0.25;
+                ty = h/2 + sin(t*0.7)*h*0.2;
+                const fx = tx + cos(t*kx+seed)*wr.x;
+                const fy = ty + sin(t*ky+seed)*wr.y;
+                cx += min(w/100, (fx-cx)/10);
+                cy += min(w/100, (fy-cy)/10);
+
+                let count = 0;
+                pts.forEach(pt => {
+                    const dx = pt.x-cx, dy = pt.y-cy;
+                    const len = hypot(dx, dy);
+                    let pr = min(1.5, w/len/5);
+                    const inc = len < w/6 && (count++) < 6;
+                    pt.r = inc ? pr*1.5 : pr;
+                    pt.len = max(0, min(pt.len + (inc ? 0.1 : -0.1), 1));
+                    if (!pt.len) return;
+                    legs.forEach(lg => {
+                        ctx.beginPath();
+                        ctx.moveTo(cx+lg.x*r, cy+lg.y*r);
+                        ctx.lineTo(lerp(cx+lg.x*r, pt.x, pt.len*pt.len), lerp(cy+lg.y*r, pt.y, pt.len*pt.len));
+                        ctx.stroke();
+                    });
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, pt.r, 0, PI*2);
+                    ctx.fill();
+                });
+
+                self.raf = requestAnimationFrame(draw);
+            }
+            this.raf = requestAnimationFrame(draw);
+        },
+        destroy() {
+            if (this.raf) cancelAnimationFrame(this.raf);
+        }
+    };
+};

@@ -155,6 +155,14 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
         unset($this->themes, $this->activeTheme);
     }
 
+    public function deactivateTheme(int $themeId): void
+    {
+        $theme = ParticleTheme::findOrFail($themeId);
+        $theme->update(['is_active' => false]);
+        session()->flash('message', "'{$theme->name}' teması devre dışı bırakıldı.");
+        unset($this->themes, $this->activeTheme);
+    }
+
     public function deleteTheme(int $themeId): void
     {
         $theme = ParticleTheme::findOrFail($themeId);
@@ -293,9 +301,15 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
              class="bg-neutral-900 rounded-xl border {{ $theme->is_active ? 'border-fuchsia-500' : 'border-white/5' }} overflow-hidden group">
             {{-- Preview --}}
             @php $pp = $this->getPreviewParams($theme); @endphp
+            @if(($theme->config['renderer'] ?? null) === 'spider')
+            <div class="h-36 relative overflow-hidden bg-neutral-950"
+                 x-data="spiderPreview('{{ $theme->config['color'] ?? '#ffffff' }}')" x-init="init()">
+                <canvas x-ref="spiderCanvas" class="w-full h-full"></canvas>
+            @else
             <div class="h-36 relative overflow-hidden bg-neutral-950"
                  x-data="particlePreview({{ Js::from($pp) }})" x-on:remove.window="destroy()">
                 <canvas x-ref="canvas" class="w-full h-full"></canvas>
+            @endif
                 @if($theme->is_active)
                 <div class="absolute top-3 right-3 px-2 py-1 bg-fuchsia-500 text-white text-[10px] font-bold rounded-md uppercase tracking-wider">
                     Aktif
@@ -343,9 +357,10 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
                     Aktifleştir
                 </button>
                 @else
-                <div class="w-full px-3 py-1.5 bg-fuchsia-500/10 text-fuchsia-400 text-xs font-medium rounded-lg text-center">
-                    Kullanımda
-                </div>
+                <button wire:click="deactivateTheme({{ $theme->id }})"
+                        class="w-full px-3 py-1.5 bg-fuchsia-500/10 text-fuchsia-400 hover:bg-red-500/10 hover:text-red-400 text-xs font-medium rounded-lg text-center transition-all">
+                    Devre Dışı Bırak
+                </button>
                 @endif
             </div>
         </div>
@@ -368,10 +383,10 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
         + Yeni Tema Oluştur
     </button>
 
-    {{-- ═══ BAT ANİMASYONU BÖLÜMÜ ═══ --}}
+    {{-- ═══ ANİMASYONLAR BÖLÜMÜ ═══ --}}
     <div class="mt-8">
         <div class="flex items-center justify-between mb-6">
-            <h2 class="text-neutral-400">Yarasa Animasyonu</h2>
+            <h2 class="text-neutral-400">Animasyonlar</h2>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -424,9 +439,10 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
                         Aktifleştir
                     </button>
                     @else
-                    <div class="w-full px-3 py-1.5 bg-purple-500/10 text-purple-400 text-xs font-medium rounded-lg text-center">
-                        Kullanımda
-                    </div>
+                    <button wire:click="toggleBatAnimation"
+                            class="w-full px-3 py-1.5 bg-purple-500/10 text-purple-400 hover:bg-red-500/10 hover:text-red-400 text-xs font-medium rounded-lg text-center transition-all">
+                        Devre Dışı Bırak
+                    </button>
                     @endif
                 </div>
 
@@ -446,18 +462,18 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
                             <div>
                                 <label class="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">Dış Renk (Kanat)</label>
                                 <div class="flex gap-1.5">
-                                    <input type="color" wire:model.live="batOuterColor"
+                                    <input type="color" wire:model="batOuterColor"
                                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 shrink-0">
-                                    <input type="text" wire:model.live="batOuterColor"
+                                    <input type="text" wire:model="batOuterColor"
                                            class="flex-1 min-w-0 px-2 py-1.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-purple-500 font-mono text-xs">
                                 </div>
                             </div>
                             <div>
                                 <label class="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">İç Renk (Gövde)</label>
                                 <div class="flex gap-1.5">
-                                    <input type="color" wire:model.live="batInnerColor"
+                                    <input type="color" wire:model="batInnerColor"
                                            class="w-8 h-8 rounded cursor-pointer bg-transparent border-0 shrink-0">
-                                    <input type="text" wire:model.live="batInnerColor"
+                                    <input type="text" wire:model="batInnerColor"
                                            class="flex-1 min-w-0 px-2 py-1.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-purple-500 font-mono text-xs">
                                 </div>
                             </div>
@@ -466,28 +482,28 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
                         {{-- Sayı --}}
                         <div>
                             <label class="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">Yarasa Sayısı</label>
-                            <input type="number" wire:model.live="batCount" min="1" max="30"
+                            <input type="number" wire:model="batCount" min="1" max="30"
                                    class="w-full px-3 py-1.5 bg-neutral-800 border border-neutral-700 rounded-lg focus:outline-none focus:border-purple-500 font-mono text-xs">
                         </div>
 
                         {{-- Boyut --}}
                         <div>
                             <label class="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">Boyut — {{ $batScale }}x</label>
-                            <input type="range" wire:model.live="batScale" min="0.5" max="6" step="0.5"
+                            <input type="range" wire:model="batScale" min="0.5" max="6" step="0.5"
                                    class="w-full accent-purple-500">
                         </div>
 
                         {{-- Uçuş Hızı --}}
                         <div>
                             <label class="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">Uçuş Hızı — {{ $batSpeed }}s</label>
-                            <input type="range" wire:model.live="batSpeed" min="5" max="60" step="1"
+                            <input type="range" wire:model="batSpeed" min="5" max="60" step="1"
                                    class="w-full accent-purple-500">
                         </div>
 
                         {{-- Kanat Çırpma Hızı --}}
                         <div>
                             <label class="block text-[10px] uppercase tracking-wider text-neutral-500 mb-1">Kanat Çırpma Hızı — {{ $batFlapSpeed }}s</label>
-                            <input type="range" wire:model.live="batFlapSpeed" min="0.1" max="2" step="0.1"
+                            <input type="range" wire:model="batFlapSpeed" min="0.1" max="2" step="0.1"
                                    class="w-full accent-purple-500">
                             <p class="text-[10px] text-neutral-400 mt-0.5">Düşük = hızlı çırpma, yüksek = yavaş çırpma</p>
                         </div>
@@ -508,6 +524,7 @@ new #[Layout('admin.layout')] #[Title('Particles Yönetimi')] class extends Comp
                 </div>
                 @endif
             </div>
+
         </div>
     </div>
 

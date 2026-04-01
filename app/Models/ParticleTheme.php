@@ -90,6 +90,12 @@ class ParticleTheme extends Model
                 'preview_color' => '#e2e8f0',
                 'config' => self::snowConfig(),
             ],
+            [
+                'name' => 'Spider Cursor',
+                'slug' => 'spider',
+                'preview_color' => '#10b981',
+                'config' => self::spiderConfig(),
+            ],
         ];
     }
 
@@ -213,6 +219,15 @@ class ParticleTheme extends Model
                 ],
             ],
             'detectRetina' => true,
+        ];
+    }
+
+    private static function spiderConfig(): array
+    {
+        return [
+            'renderer' => 'spider',
+            'spider_count' => 2,
+            'color' => '#ffffff',
         ];
     }
 

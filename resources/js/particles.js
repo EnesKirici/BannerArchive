@@ -1,5 +1,6 @@
 import { tsParticles } from "@tsparticles/engine";
 import { loadSlim } from "@tsparticles/slim";
+import { initSpiderAnimation } from './spider-animation';
 
 // Default fallback config (Links theme)
 const defaultConfig = {
@@ -35,15 +36,12 @@ const defaultConfig = {
 };
 
 export async function initParticles() {
-    // Only initialize if the container element exists on this page
     const container = document.getElementById('tsparticles');
     if (!container) return;
 
-    await loadSlim(tsParticles);
-
     // Try to fetch config from API
     let config = defaultConfig;
-    
+
     try {
         const response = await fetch('/api/particles/config');
         if (response.ok) {
@@ -55,6 +53,14 @@ export async function initParticles() {
     } catch (error) {
         console.warn('Failed to load particles config, using default:', error);
     }
+
+    // Spider renderer — tsParticles yerine kendi canvas animasyonunu kullanır
+    if (config.renderer === 'spider') {
+        initSpiderAnimation(container, config);
+        return;
+    }
+
+    await loadSlim(tsParticles);
 
     // Add common settings
     config.fullScreen = false;
@@ -69,7 +75,7 @@ export async function initParticles() {
 // Hot reload support for development
 if (import.meta.hot) {
     import.meta.hot.accept(() => {
-        tsParticles.dom().forEach(container => container.destroy());
+        tsParticles.dom().forEach(c => c.destroy());
         initParticles();
     });
 }
