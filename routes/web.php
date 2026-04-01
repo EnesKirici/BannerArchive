@@ -6,20 +6,22 @@ use App\Http\Controllers\TMDBController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
-// Public Routes
-Route::get('/', [TMDBController::class, 'index'])->name('home');
-Route::get('/search', [TMDBController::class, 'search'])->name('search')->middleware('throttle:search');
-Route::get('/images/{type}/{id}', [TMDBController::class, 'images'])->name('images')->middleware('throttle:browse');
-Route::get('/proxy-image', [TMDBController::class, 'proxyImage'])->name('proxy.image')->middleware('throttle:download');
-Route::get('/gallery/{type}/{id}', [TMDBController::class, 'gallery'])->name('gallery')->where(['type' => 'movie|tv', 'id' => '[0-9]+'])->middleware('throttle:browse');
-Route::post('/generate-quotes', [TMDBController::class, 'generateQuotes'])->name('generate.quotes')->middleware('throttle:quotes');
-Route::get('/person/{id}/credits', [TMDBController::class, 'personCredits'])->name('person.credits')->where('id', '[0-9]+')->middleware('throttle:browse');
+// Public Routes (bfcache enabled)
+Route::middleware(\App\Http\Middleware\EnableBfCache::class)->group(function () {
+    Route::get('/', [TMDBController::class, 'index'])->name('home');
+    Route::get('/search', [TMDBController::class, 'search'])->name('search')->middleware('throttle:search');
+    Route::get('/images/{type}/{id}', [TMDBController::class, 'images'])->name('images')->middleware('throttle:browse');
+    Route::get('/proxy-image', [TMDBController::class, 'proxyImage'])->name('proxy.image')->middleware('throttle:download');
+    Route::get('/gallery/{type}/{id}', [TMDBController::class, 'gallery'])->name('gallery')->where(['type' => 'movie|tv', 'id' => '[0-9]+'])->middleware('throttle:browse');
+    Route::post('/generate-quotes', [TMDBController::class, 'generateQuotes'])->name('generate.quotes')->middleware('throttle:quotes');
+    Route::get('/person/{id}/credits', [TMDBController::class, 'personCredits'])->name('person.credits')->where('id', '[0-9]+')->middleware('throttle:browse');
 
-// Particles API (public - for frontend)
-Route::get('/api/particles/config', [AdminController::class, 'getActiveThemeConfig'])->name('api.particles.config')->middleware('throttle:60,1');
+    // Particles API (public - for frontend)
+    Route::get('/api/particles/config', [AdminController::class, 'getActiveThemeConfig'])->name('api.particles.config')->middleware('throttle:60,1');
 
-// Tools (Public)
-Volt::route('/tools/image-converter', 'image-converter')->name('tools.image-converter');
+    // Tools (Public)
+    Volt::route('/tools/image-converter', 'image-converter')->name('tools.image-converter');
+});
 
 // Auth Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
