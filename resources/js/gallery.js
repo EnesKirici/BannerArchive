@@ -96,6 +96,11 @@ function initGallery() {
         const overviewLabel = document.getElementById('overviewLabel');
         let expanded = false;
 
+        if (overviewText.scrollHeight > overviewText.clientHeight) {
+            overviewToggle.classList.remove('hidden');
+            overviewToggle.classList.add('flex');
+        }
+
         overviewToggle.addEventListener('click', () => {
             expanded = !expanded;
             overviewText.classList.toggle('line-clamp-2', !expanded);

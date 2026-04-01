@@ -50,15 +50,13 @@
                 @if($movie['overview'])
                     <div class="mt-3 max-w-2xl" id="overviewContainer">
                         <p class="text-sm text-neutral-400 line-clamp-2" id="overviewText">{{ $movie['overview'] }}</p>
-                        @if(mb_strlen($movie['overview']) > 120)
-                            <button
-                                id="overviewToggle"
-                                class="mt-1.5 text-xs font-medium text-fuchsia-400 hover:text-fuchsia-300 transition-colors flex items-center gap-1 cursor-pointer"
-                            >
-                                <svg class="w-3.5 h-3.5 transition-transform" id="overviewArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                <span id="overviewLabel">Devamını Oku</span>
-                            </button>
-                        @endif
+                        <button
+                            id="overviewToggle"
+                            class="hidden mt-1.5 text-xs font-medium text-fuchsia-400 hover:text-fuchsia-300 transition-colors items-center gap-1 cursor-pointer"
+                        >
+                            <svg class="w-3.5 h-3.5 transition-transform" id="overviewArrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            <span id="overviewLabel">Devamını Oku</span>
+                        </button>
                     </div>
                 @endif
 
