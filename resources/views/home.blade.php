@@ -9,7 +9,7 @@
     <!-- Mobile Header -->
     <div class="md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-neutral-900/95 backdrop-blur-md sticky top-0 z-40">
         <div class="flex items-center gap-2">
-            <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-7 h-7 rounded elw-logo-hover">
+            <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-7 h-7 rounded elw-logo-hover object-cover aspect-square">
             <span class="font-bold tracking-tight">BannerArchive</span>
         </div>
         <button onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full')" class="cursor-pointer text-white p-2">
@@ -28,7 +28,7 @@
         <!-- Sidebar Header -->
         <div class="p-6 pb-4 hidden md:block shrink-0 bg-neutral-900 z-20">
             <div class="flex items-center gap-3">
-                <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-9 h-9 rounded-lg elw-logo-animated elw-logo-hover">
+                <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-9 h-9 rounded-lg elw-logo-animated elw-logo-hover object-cover aspect-square">
                 <h2 class="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-neutral-400 tracking-tight">BannerArchive</h2>
             </div>
         </div>

@@ -5,7 +5,7 @@
             {{-- Logo & Açıklama --}}
             <div>
                 <a href="{{ route('home') }}" class="inline-flex items-center gap-3 mb-2 group">
-                    <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-8 h-8 rounded-lg elw-logo-hover">
+                    <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-8 h-8 rounded-lg elw-logo-hover object-cover aspect-square">
                     <span class="text-lg font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-neutral-400 tracking-tight">BannerArchive</span>
                 </a>
                 <p class="text-sm text-neutral-500 leading-relaxed max-w-xs">

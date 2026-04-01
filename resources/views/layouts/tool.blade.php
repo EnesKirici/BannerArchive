@@ -33,7 +33,7 @@
     <nav class="border-b border-white/5 bg-neutral-900/80 backdrop-blur-md sticky top-0 z-40">
         <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
             <a href="{{ route('home') }}" class="flex items-center gap-3 group">
-                <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-8 h-8 rounded-lg elw-logo-hover">
+                <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-8 h-8 rounded-lg elw-logo-hover object-cover aspect-square">
                 <span class="text-lg font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-neutral-400 tracking-tight">BannerArchive</span>
             </a>
             <div class="flex items-center gap-2 text-sm text-neutral-500">
