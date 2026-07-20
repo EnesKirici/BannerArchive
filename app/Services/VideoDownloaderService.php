@@ -26,11 +26,18 @@ class VideoDownloaderService
 
     private const INSTAGRAM_PATH_PREFIXES = ['/reel/', '/reels/', '/p/', '/tv/'];
 
-    /** @var array<string, string> Format anahtarı → yt-dlp format seçici */
+    /**
+     * Format anahtarı → yt-dlp format seçici.
+     *
+     * H.264 (avc1) + AAC (m4a) öncelikli: Twitter/X gibi platformlar AV1, VP9
+     * ve HEVC codec'lerini kabul etmediği için önce avc1 denenir.
+     *
+     * @var array<string, string>
+     */
     private const FORMAT_MAP = [
-        'mp4_best' => 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b',
-        'mp4_720' => 'bv*[ext=mp4][height<=720]+ba[ext=m4a]/b[ext=mp4][height<=720]/bv*[height<=720]+ba/b',
-        'mp4_480' => 'bv*[ext=mp4][height<=480]+ba[ext=m4a]/b[ext=mp4][height<=480]/bv*[height<=480]+ba/b',
+        'mp4_best' => 'bv*[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/bv*[vcodec^=avc1]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1]/bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b',
+        'mp4_720' => 'bv*[ext=mp4][vcodec^=avc1][height<=720]+ba[ext=m4a]/bv*[vcodec^=avc1][height<=720]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1][height<=720]/bv*[ext=mp4][height<=720]+ba[ext=m4a]/b[ext=mp4][height<=720]/bv*[height<=720]+ba/b',
+        'mp4_480' => 'bv*[ext=mp4][vcodec^=avc1][height<=480]+ba[ext=m4a]/bv*[vcodec^=avc1][height<=480]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1][height<=480]/bv*[ext=mp4][height<=480]+ba[ext=m4a]/b[ext=mp4][height<=480]/bv*[height<=480]+ba/b',
         'mp3' => 'ba/b',
     ];
 
