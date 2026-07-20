@@ -26,6 +26,10 @@
                 <li>
                     <a href="{{ route('tools.image-converter') }}" class="text-sm text-neutral-500 hover:text-fuchsia-400 transition-colors duration-300">Resim Dönüştürücü</a>
                 </li>
+                <li class="text-neutral-700">|</li>
+                <li>
+                    <a href="{{ route('tools.video-downloader') }}" class="text-sm text-neutral-500 hover:text-cyan-400 transition-colors duration-300">Video İndirici</a>
+                </li>
             </ul>
 
         </div>

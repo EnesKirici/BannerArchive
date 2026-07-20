@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TMDBController;
+use App\Http\Controllers\VideoDownloadController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -24,6 +25,8 @@ Route::middleware(\App\Http\Middleware\EnableBfCache::class)->group(function () 
 
     // Tools (Public)
     Volt::route('/tools/image-converter', 'image-converter')->name('tools.image-converter');
+    Volt::route('/tools/video-downloader', 'video-downloader')->name('tools.video-downloader');
+    Route::get('/tools/video-downloader/file/{token}', [VideoDownloadController::class, 'download'])->name('tools.video-downloader.file')->middleware('throttle:download');
 });
 
 // Auth Routes

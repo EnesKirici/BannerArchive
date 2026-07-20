@@ -40,6 +40,12 @@ return [
         'base_url' => env('TMDB_BASE_URL', 'https://api.themoviedb.org/3'),
     ],
 
+    'ytdlp' => [
+        'binary' => env('YTDLP_BINARY', 'yt-dlp'),
+        'ffmpeg_location' => env('FFMPEG_LOCATION'),
+        'cookies_file' => env('YTDLP_COOKIES_FILE'),
+    ],
+
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/models'),

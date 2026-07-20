@@ -63,6 +63,35 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Video İndirici Ayarları
+    |--------------------------------------------------------------------------
+    */
+
+    'video' => [
+        // Maksimum indirilebilir dosya boyutu (MB)
+        'max_filesize_mb' => (int) env('VIDEO_MAX_FILESIZE_MB', 500),
+
+        // yt-dlp indirme işlemi zaman aşımı (saniye)
+        'process_timeout' => (int) env('VIDEO_PROCESS_TIMEOUT', 300),
+
+        // Video bilgisi çekme zaman aşımı (saniye)
+        'info_timeout' => (int) env('VIDEO_INFO_TIMEOUT', 60),
+
+        // Geçersiz platform URL denemesi sonrası ban eşiği
+        'ban_after_attempts' => (int) env('VIDEO_BAN_AFTER_ATTEMPTS', 10),
+
+        // Şüpheli URL takip penceresi (dakika)
+        'suspicious_window' => (int) env('VIDEO_SUSPICIOUS_WINDOW', 30),
+
+        // Dakikada izin verilen bilgi çekme isteği (IP başına)
+        'rate_limit_info' => (int) env('VIDEO_RATE_LIMIT_INFO', 10),
+
+        // Dakikada izin verilen indirme isteği (IP başına)
+        'rate_limit_download' => (int) env('VIDEO_RATE_LIMIT_DOWNLOAD', 3),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | IP Whitelist
     |--------------------------------------------------------------------------
     | Bu IP'ler asla otomatik olarak banlanmaz.

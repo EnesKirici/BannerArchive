@@ -6,7 +6,7 @@ use function Pest\Laravel\get;
 
 test('the application returns clickable popular sidebar items', function () {
     Http::fake([
-        'https://api.themoviedb.org/3/movie/popular*' => Http::response([
+        'https://api.themoviedb.org/3/trending/movie/day*' => Http::response([
             'results' => [[
                 'id' => 1,
                 'title' => 'Inception',
@@ -17,7 +17,7 @@ test('the application returns clickable popular sidebar items', function () {
                 'release_date' => '2010-07-16',
             ]],
         ], 200),
-        'https://api.themoviedb.org/3/tv/popular*' => Http::response([
+        'https://api.themoviedb.org/3/trending/tv/day*' => Http::response([
             'results' => [[
                 'id' => 2,
                 'name' => 'Dark',

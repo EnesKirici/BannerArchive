@@ -133,8 +133,24 @@
 
             <livewire:movie-search />
 
+            {{-- Araçlar --}}
+            <div class="flex flex-wrap justify-center gap-3 mt-10">
+                <a href="{{ route('tools.image-converter') }}" class="group flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-fuchsia-600/10 border border-fuchsia-500/25 hover:bg-fuchsia-600 hover:border-fuchsia-500 text-fuchsia-300 hover:text-white text-sm font-semibold transition-all duration-300 shadow-lg shadow-fuchsia-600/5 hover:shadow-fuchsia-600/25">
+                    <svg class="w-4 h-4 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Resim Dönüştürücü
+                </a>
+                <a href="{{ route('tools.video-downloader') }}" class="group flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-cyan-600/10 border border-cyan-500/25 hover:bg-cyan-600 hover:border-cyan-500 text-cyan-300 hover:text-white text-sm font-semibold transition-all duration-300 shadow-lg shadow-cyan-600/5 hover:shadow-cyan-600/25">
+                    <svg class="w-4 h-4 group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Video İndirici
+                </a>
+            </div>
+
             {{-- Özellik Rozetleri --}}
-            <div class="flex flex-wrap justify-center gap-3 mt-14">
+            <div class="flex flex-wrap justify-center gap-3 mt-8">
                 @foreach([
                     ['HD Bannerlar', 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'],
                     ['Toplu İndirme', 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'],
