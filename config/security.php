@@ -59,6 +59,12 @@ return [
 
         // Şüpheli yükleme takip penceresi (dakika)
         'suspicious_window' => (int) env('UPLOAD_SUSPICIOUS_WINDOW', 30),
+
+        // Dakikada izin verilen yükleme isteği (IP başına)
+        'rate_limit_upload' => (int) env('UPLOAD_RATE_LIMIT', 15),
+
+        // Dakikada izin verilen dönüştürme isteği (IP başına)
+        'rate_limit_convert' => (int) env('CONVERT_RATE_LIMIT', 10),
     ],
 
     /*
@@ -88,6 +94,12 @@ return [
 
         // Dakikada izin verilen indirme isteği (IP başına)
         'rate_limit_download' => (int) env('VIDEO_RATE_LIMIT_DOWNLOAD', 3),
+
+        // Sunucuda aynı anda çalışabilecek toplam indirme sayısı
+        'max_concurrent_downloads' => (int) env('VIDEO_MAX_CONCURRENT', 3),
+
+        // İndirme çıktısında izin verilen dosya uzantıları
+        'allowed_output_extensions' => ['mp4', 'mp3', 'm4a', 'webm', 'mkv', 'mov'],
     ],
 
     /*

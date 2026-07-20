@@ -194,10 +194,18 @@ class VideoDownloaderService
         }
 
         $path = array_values($finalFiles)[0];
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $allowedExtensions = (array) config('security.video.allowed_output_extensions', ['mp4', 'mp3', 'm4a', 'webm', 'mkv', 'mov']);
+
+        if (! in_array($extension, $allowedExtensions, true)) {
+            @unlink($path);
+
+            throw new \RuntimeException('Beklenmeyen çıktı formatı, indirme iptal edildi.');
+        }
 
         return [
             'path' => $path,
-            'ext' => strtolower(pathinfo($path, PATHINFO_EXTENSION)),
+            'ext' => $extension,
             'size' => (int) filesize($path),
         ];
     }

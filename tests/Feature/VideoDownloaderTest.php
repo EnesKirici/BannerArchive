@@ -112,6 +112,34 @@ test('prepares download and exposes a token URL', function () {
     File::delete($path);
 });
 
+test('fetch info is rate limited per IP', function () {
+    $max = (int) config('security.video.rate_limit_info', 10);
+
+    foreach (range(1, $max) as $i) {
+        \Illuminate\Support\Facades\RateLimiter::hit('video-info:127.0.0.1', 60);
+    }
+
+    Volt::test('video-downloader')
+        ->set('url', 'https://www.youtube.com/watch?v=abc123')
+        ->call('fetchInfo')
+        ->assertSet('messageType', 'error')
+        ->assertSet('videoInfo', null);
+});
+
+test('image converter conversion is rate limited per IP', function () {
+    $max = (int) config('security.upload.rate_limit_convert', 10);
+
+    foreach (range(1, $max) as $i) {
+        \Illuminate\Support\Facades\RateLimiter::hit('image-convert:127.0.0.1', 60);
+    }
+
+    Volt::test('image-converter')
+        ->set('convertedFiles', [['id' => 'f_test', 'status' => 'pending', 'tempPath' => null, 'tempUploadPath' => '/tmp/none', 'originalName' => 'x.png', 'originalFormat' => 'png', 'originalSize' => 1, 'originalWidth' => 1, 'originalHeight' => 1, 'previewUrl' => null, 'convertedSize' => null, 'convertedWidth' => null, 'convertedHeight' => null, 'convertedFormat' => null, 'error' => null]])
+        ->call('convert')
+        ->assertSet('messageType', 'error')
+        ->assertSet('message', 'Çok fazla istek gönderdiniz, lütfen bir dakika bekleyin.');
+});
+
 test('download route returns 404 for unknown token', function () {
     get('/tools/video-downloader/file/'.str_repeat('a', 40))
         ->assertNotFound();

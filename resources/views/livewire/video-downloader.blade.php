@@ -116,9 +116,31 @@ new #[Layout('layouts.tool')] #[Title('Video İndirici')] class extends Componen
             return;
         }
 
+        $ipLock = Cache::lock("video-dl-ip-{$ip}", (int) config('security.video.process_timeout', 300) + 60);
+
+        if (! $ipLock->get()) {
+            $this->message = 'Devam eden bir indirmeniz var, tamamlanmasını bekleyin.';
+            $this->messageType = 'error';
+
+            return;
+        }
+
+        $activeKey = 'video_dl_active_count';
+        $maxConcurrent = (int) config('security.video.max_concurrent_downloads', 3);
+
+        if ((int) Cache::get($activeKey, 0) >= $maxConcurrent) {
+            $ipLock->release();
+            $this->message = 'Sunucu şu anda yoğun, lütfen birkaç dakika sonra tekrar deneyin.';
+            $this->messageType = 'error';
+
+            return;
+        }
+
         RateLimiter::hit($limitKey, 60);
 
         set_time_limit((int) config('security.video.process_timeout', 300) + 30);
+
+        Cache::put($activeKey, (int) Cache::get($activeKey, 0) + 1, 900);
 
         try {
             $result = $service->download(trim($this->url), $this->format);
@@ -144,6 +166,9 @@ new #[Layout('layouts.tool')] #[Title('Video İndirici')] class extends Componen
             Log::channel('daily')->error('Video indirilemedi', ['url' => $this->url, 'error' => $e->getMessage()]);
             $this->message = 'Video indirilemedi, lütfen tekrar deneyin.';
             $this->messageType = 'error';
+        } finally {
+            Cache::put($activeKey, max(0, (int) Cache::get($activeKey, 1) - 1), 900);
+            $ipLock->release();
         }
     }
 

@@ -24,8 +24,8 @@ Route::middleware(\App\Http\Middleware\EnableBfCache::class)->group(function () 
     Route::get('/api/bat-animation/config', [AdminController::class, 'getBatAnimationConfig'])->name('api.bat-animation.config')->middleware('throttle:60,1');
 
     // Tools (Public)
-    Volt::route('/tools/image-converter', 'image-converter')->name('tools.image-converter');
-    Volt::route('/tools/video-downloader', 'video-downloader')->name('tools.video-downloader');
+    Volt::route('/tools/image-converter', 'image-converter')->name('tools.image-converter')->middleware('throttle:browse');
+    Volt::route('/tools/video-downloader', 'video-downloader')->name('tools.video-downloader')->middleware('throttle:browse');
     Route::get('/tools/video-downloader/file/{token}', [VideoDownloadController::class, 'download'])->name('tools.video-downloader.file')->middleware('throttle:download');
 });
 

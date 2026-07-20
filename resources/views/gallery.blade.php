@@ -3,7 +3,20 @@
 @section('title', $movie['title'] . ' - Galeri')
 
 @section('content')
-<div class="flex flex-col min-h-screen bg-neutral-950 text-white font-sans">
+<div class="relative flex flex-col min-h-screen bg-neutral-950 text-white font-sans">
+
+    {{-- Üst Bar: logo + hızlı arama --}}
+    <div class="absolute top-0 inset-x-0 z-30">
+        <div class="max-w-[1920px] mx-auto px-6 md:px-12 py-4 flex items-center gap-4">
+            <a href="{{ route('home') }}" class="flex items-center gap-2.5 shrink-0 group">
+                <img src="{{ asset('images/elw.jpg') }}" alt="elw" class="w-8 h-8 rounded-lg elw-logo-hover object-cover aspect-square">
+                <span class="hidden md:block text-base font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-neutral-400 tracking-tight">BannerArchive</span>
+            </a>
+            <div class="flex-1 max-w-lg ml-auto">
+                <livewire:gallery-search />
+            </div>
+        </div>
+    </div>
 
     <div class="flex-1">
     {{-- Hero Banner --}}

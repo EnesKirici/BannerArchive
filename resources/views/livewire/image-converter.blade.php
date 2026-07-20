@@ -5,6 +5,7 @@ use App\Models\SecurityLog;
 use App\Services\ImageConverterService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -32,6 +33,12 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
     {
         $this->message = '';
         $this->messageType = '';
+
+        if ($this->isRateLimited('image-upload', (int) config('security.upload.rate_limit_upload', 15))) {
+            $this->photos = [];
+
+            return;
+        }
 
         $maxSizeKb = config('security.upload.max_size_kb', 10240);
 
@@ -116,6 +123,10 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
             $this->message = 'Lütfen önce dosya yükleyin.';
             $this->messageType = 'error';
 
+            return;
+        }
+
+        if ($this->isRateLimited('image-convert', (int) config('security.upload.rate_limit_convert', 10))) {
             return;
         }
 
@@ -247,6 +258,22 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
         $this->convertedFiles = [];
         $this->message = '';
         $this->messageType = '';
+    }
+
+    private function isRateLimited(string $action, int $maxAttempts): bool
+    {
+        $key = "{$action}:".request()->ip();
+
+        if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+            $this->message = 'Çok fazla istek gönderdiniz, lütfen bir dakika bekleyin.';
+            $this->messageType = 'error';
+
+            return true;
+        }
+
+        RateLimiter::hit($key, 60);
+
+        return false;
     }
 
     private function trackSuspiciousUpload(string $ip, string $fileName, string $reason): void
