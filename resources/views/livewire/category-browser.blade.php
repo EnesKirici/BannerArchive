@@ -1,7 +1,6 @@
 <?php
 
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use App\Services\TmdbClient;
 use Livewire\Component;
 
 new class extends Component
@@ -61,31 +60,32 @@ new class extends Component
 
     private function fetchItems(): void
     {
-        $cacheKey = "tmdb_category_{$this->mediaType}_{$this->category}";
+        $tmdb = app(TmdbClient::class);
 
-        $this->items = Cache::remember($cacheKey, now()->addHours(3), function (): array {
-            $apiKey = config('services.tmdb.api_key');
-            $baseUrl = config('services.tmdb.base_url');
+        // TMDB'ye ulaşılamazsa bayat kopyaya, o da yoksa boş listeye düşülür;
+        // bileşen hata fırlatmaz, ana sayfayı 500'e düşürmez.
+        $this->items = $tmdb->remember(
+            "tmdb_category_{$this->mediaType}_{$this->category}",
+            now()->addHours(3),
+            function () use ($tmdb): ?array {
+                $data = $tmdb->get("/{$this->mediaType}/{$this->category}", [
+                    'language' => 'tr-TR',
+                    'page' => 1,
+                ]);
 
-            $response = Http::get("{$baseUrl}/{$this->mediaType}/{$this->category}", [
-                'api_key' => $apiKey,
-                'language' => 'tr-TR',
-                'page' => 1,
-            ]);
+                if ($data === null) {
+                    return null;
+                }
 
-            if (! $response->successful()) {
-                return [];
-            }
-
-            $results = $response->json()['results'] ?? [];
-
-            return collect($results)
-                ->filter(fn (array $item): bool => ! empty($item['backdrop_path']))
-                ->take(12)
-                ->map(fn (array $item): array => $this->formatItem($item))
-                ->values()
-                ->all();
-        });
+                return collect($data['results'] ?? [])
+                    ->filter(fn (array $item): bool => ! empty($item['backdrop_path']))
+                    ->take(12)
+                    ->map(fn (array $item): array => $this->formatItem($item))
+                    ->values()
+                    ->all();
+            },
+            default: [],
+        );
     }
 
     /**

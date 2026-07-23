@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Support\Facades\Http;
+use App\Services\TmdbClient;
 use Livewire\Component;
 
 new class extends Component
@@ -32,19 +32,18 @@ new class extends Component
 
     private function performSearch(): void
     {
-        $response = Http::get(config('services.tmdb.base_url').'/search/multi', [
-            'api_key' => config('services.tmdb.api_key'),
+        $data = app(TmdbClient::class)->get('/search/multi', [
             'query' => $this->search,
             'language' => 'tr-TR',
             'include_adult' => false,
         ]);
 
-        if (! $response->successful()) {
+        if ($data === null) {
             return;
         }
 
         $items = array_filter(
-            $response->json()['results'] ?? [],
+            $data['results'] ?? [],
             fn (array $item): bool => in_array($item['media_type'] ?? '', ['movie', 'tv'], true) && ! empty($item['poster_path'])
         );
 

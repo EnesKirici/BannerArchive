@@ -11,7 +11,7 @@ use Livewire\Volt\Volt;
 Route::middleware(\App\Http\Middleware\EnableBfCache::class)->group(function () {
     Route::get('/', [TMDBController::class, 'index'])->name('home');
     Route::get('/search', [TMDBController::class, 'search'])->name('search')->middleware('throttle:search');
-    Route::get('/images/{type}/{id}', [TMDBController::class, 'images'])->name('images')->middleware('throttle:browse');
+    Route::get('/images/{type}/{id}', [TMDBController::class, 'images'])->name('images')->where(['type' => 'movie|tv', 'id' => '[0-9]+'])->middleware('throttle:browse');
     Route::get('/proxy-image', [TMDBController::class, 'proxyImage'])->name('proxy.image')->middleware('throttle:download');
     Route::get('/gallery/{type}/{id}', [TMDBController::class, 'gallery'])->name('gallery')->where(['type' => 'movie|tv', 'id' => '[0-9]+'])->middleware('throttle:browse');
     Route::post('/generate-quotes', [TMDBController::class, 'generateQuotes'])->name('generate.quotes')->middleware('throttle:quotes');

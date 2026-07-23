@@ -6,6 +6,8 @@ use App\Http\Requests\GenerateQuotesRequest;
 use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Services\QuoteGeneratorService;
+use App\Services\TmdbClient;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -14,34 +16,18 @@ use Illuminate\View\View;
 
 class TMDBController extends Controller
 {
-    private string $baseUrl;
-
-    public function __construct()
-    {
-        $this->baseUrl = config('services.tmdb.base_url');
-    }
+    public function __construct(private readonly TmdbClient $tmdb) {}
 
     public function gallery(Request $request, string $type, int $id): View
     {
-        $apiKey = config('services.tmdb.api_key');
-
-        $data = Cache::remember("tmdb_{$type}_{$id}_full", now()->addHours(6), function () use ($apiKey, $type, $id) {
-            $response = Http::get("{$this->baseUrl}/{$type}/{$id}", [
-                'api_key' => $apiKey,
-                'language' => 'tr-TR',
-                'append_to_response' => 'images,credits,watch/providers,videos',
-                'include_image_language' => 'tr,en,null',
-            ]);
-
-            if (! $response->successful()) {
-                return null;
-            }
-
-            return $response->json();
-        });
+        $data = $this->tmdb->remember("tmdb_{$type}_{$id}_full", now()->addHours(6), fn () => $this->tmdb->get("/{$type}/{$id}", [
+            'language' => 'tr-TR',
+            'append_to_response' => 'images,credits,watch/providers,videos',
+            'include_image_language' => 'tr,en,null',
+        ]));
 
         if (! $data) {
-            abort(404);
+            abort($this->tmdb->unavailable() ? 503 : 404);
         }
 
         $images = [
@@ -87,28 +73,8 @@ class TMDBController extends Controller
 
     public function index(): View
     {
-        $apiKey = config('services.tmdb.api_key');
-
-        $popularMovies = Cache::remember('tmdb_trending_movies', now()->addHours(3), function () use ($apiKey) {
-            $results = Http::get("{$this->baseUrl}/trending/movie/day", [
-                'api_key' => $apiKey,
-                'language' => 'tr-TR',
-            ])->json()['results'] ?? [];
-
-            return collect($results)->take(10)->map(fn ($m) => $this->formatItem($m, 'movie'))->all();
-        });
-
-        $popularShows = Cache::remember('tmdb_trending_shows', now()->addHours(3), function () use ($apiKey) {
-            $results = Http::get("{$this->baseUrl}/trending/tv/day", [
-                'api_key' => $apiKey,
-                'language' => 'tr-TR',
-            ])->json()['results'] ?? [];
-
-            return collect($results)->take(10)->map(fn ($s) => $this->formatItem($s, 'tv'))->all();
-        });
-
-        $popularMovies = collect($popularMovies);
-        $popularShows = collect($popularShows);
+        $popularMovies = collect($this->trending('movie'));
+        $popularShows = collect($this->trending('tv'));
 
         $galleryViewMode = (string) Setting::get('gallery_view_mode', 'gallery');
         $particlesLayer = (string) Setting::get('particles_layer', 'background');
@@ -128,23 +94,18 @@ class TMDBController extends Controller
 
         $cacheKey = 'tmdb_search_'.md5($query);
 
-        $results = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($query) {
-            $apiKey = config('services.tmdb.api_key');
-
-            $response = Http::get("{$this->baseUrl}/search/multi", [
-                'api_key' => $apiKey,
+        $results = $this->tmdb->remember($cacheKey, now()->addMinutes(30), function () use ($query) {
+            $data = $this->tmdb->get('/search/multi', [
                 'query' => $query,
                 'language' => 'tr-TR',
                 'include_adult' => false,
             ]);
 
-            if (! $response->successful()) {
+            if ($data === null) {
                 return null;
             }
 
-            $items = $response->json()['results'];
-
-            $items = array_filter($items, function ($item) {
+            $items = array_filter($data['results'] ?? [], function ($item) {
                 return ! empty($item['backdrop_path']) && $item['media_type'] !== 'person';
             });
 
@@ -152,7 +113,7 @@ class TMDBController extends Controller
         });
 
         if ($results === null) {
-            return response()->json(['error' => 'TMDB API Hatası'], 500);
+            return response()->json(['error' => 'TMDB\'ye şu an ulaşılamıyor. Lütfen birazdan tekrar deneyin.'], 503);
         }
 
         return response()->json(['results' => $results]);
@@ -164,16 +125,12 @@ class TMDBController extends Controller
             return response()->json(['error' => 'Geçersiz tür'], 400);
         }
 
-        $data = Cache::remember("tmdb_{$type}_{$id}_images", now()->addHours(6), function () use ($type, $id) {
-            $apiKey = config('services.tmdb.api_key');
-
-            $response = Http::get("{$this->baseUrl}/{$type}/{$id}/images", [
-                'api_key' => $apiKey,
-                'include_image_language' => 'tr,en,null',
-            ]);
-
-            return $response->successful() ? $response->json() : ['backdrops' => [], 'posters' => [], 'logos' => []];
-        });
+        $data = $this->tmdb->remember(
+            "tmdb_{$type}_{$id}_images",
+            now()->addHours(6),
+            fn () => $this->tmdb->get("/{$type}/{$id}/images", ['include_image_language' => 'tr,en,null']),
+            default: ['backdrops' => [], 'posters' => [], 'logos' => []],
+        );
 
         return response()->json([
             'backdrops' => $data['backdrops'] ?? [],
@@ -184,20 +141,16 @@ class TMDBController extends Controller
 
     public function personCredits(int $id): JsonResponse
     {
-        $data = Cache::remember("tmdb_person_{$id}_credits", now()->addHours(6), function () use ($id) {
-            $apiKey = config('services.tmdb.api_key');
-
-            $response = Http::get("{$this->baseUrl}/person/{$id}", [
-                'api_key' => $apiKey,
+        $data = $this->tmdb->remember("tmdb_person_{$id}_credits", now()->addHours(6), function () use ($id) {
+            $person = $this->tmdb->get("/person/{$id}", [
                 'language' => 'tr-TR',
                 'append_to_response' => 'combined_credits',
             ]);
 
-            if (! $response->successful()) {
+            if ($person === null) {
                 return null;
             }
 
-            $person = $response->json();
             $cast = $person['combined_credits']['cast'] ?? [];
 
             usort($cast, fn ($a, $b) => ($b['vote_count'] ?? 0) <=> ($a['vote_count'] ?? 0));
@@ -228,7 +181,9 @@ class TMDBController extends Controller
         });
 
         if (! $data) {
-            return response()->json(['error' => 'Kişi bulunamadı'], 404);
+            return $this->tmdb->unavailable()
+                ? response()->json(['error' => 'TMDB\'ye şu an ulaşılamıyor.'], 503)
+                : response()->json(['error' => 'Kişi bulunamadı'], 404);
         }
 
         return response()->json($data);
@@ -252,7 +207,14 @@ class TMDBController extends Controller
             abort(400, 'Geçersiz boyut');
         }
 
-        $response = Http::timeout(30)->get("https://image.tmdb.org/t/p/{$size}{$path}");
+        try {
+            $response = Http::timeout(30)
+                ->connectTimeout(5)
+                ->retry(2, 250, throw: false)
+                ->get("https://image.tmdb.org/t/p/{$size}{$path}");
+        } catch (ConnectionException) {
+            abort(502, 'Görsel alınamadı');
+        }
 
         if ($response->successful()) {
             return response($response->body())
@@ -307,6 +269,33 @@ class TMDBController extends Controller
             'quotes' => $quotes,
             'model' => $service->getUsedModel(),
         ]);
+    }
+
+    /**
+     * Günün trend listesi. TMDB'ye ulaşılamazsa bayat kopyaya, o da yoksa boş
+     * listeye düşer — ana sayfa her hâlükârda açılır.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function trending(string $type): array
+    {
+        return $this->tmdb->remember(
+            "tmdb_trending_{$type}",
+            now()->addHours(3),
+            function () use ($type) {
+                $data = $this->tmdb->get("/trending/{$type}/day", ['language' => 'tr-TR']);
+
+                if ($data === null) {
+                    return null;
+                }
+
+                return collect($data['results'] ?? [])
+                    ->take(10)
+                    ->map(fn ($item) => $this->formatItem($item, $type))
+                    ->all();
+            },
+            default: [],
+        );
     }
 
     /**

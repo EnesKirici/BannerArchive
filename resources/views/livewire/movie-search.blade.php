@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Support\Facades\Http;
+use App\Services\TmdbClient;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -13,10 +13,14 @@ new class extends Component
     /** @var array<int, array<string, mixed>> */
     public array $results = [];
 
+    /** TMDB'ye ulaşılamadığında kullanıcıya gösterilecek uyarı. */
+    public ?string $tmdbError = null;
+
     public function updatedSearch(): void
     {
         if (mb_strlen($this->search) < 2) {
             $this->results = [];
+            $this->tmdbError = null;
 
             return;
         }
@@ -71,26 +75,26 @@ new class extends Component
 
     private function performSearch(): void
     {
-        $apiKey = config('services.tmdb.api_key');
-        $baseUrl = config('services.tmdb.base_url');
-
-        $response = Http::get("{$baseUrl}/search/multi", [
-            'api_key' => $apiKey,
+        $data = app(TmdbClient::class)->get('/search/multi', [
             'query' => $this->search,
             'language' => 'tr-TR',
             'include_adult' => false,
         ]);
 
-        if ($response->successful()) {
-            $results = $response->json()['results'] ?? [];
+        if ($data === null) {
+            $this->tmdbError = 'TMDB\'ye şu an ulaşılamıyor. Lütfen birazdan tekrar deneyin.';
 
-            $results = array_filter($results, fn (array $item): bool => ! empty($item['backdrop_path']) && ($item['media_type'] ?? '') !== 'person'
-            );
-
-            $this->results = array_values(
-                array_map(fn (array $item): array => $this->formatItem($item, $item['media_type']), $results)
-            );
+            return;
         }
+
+        $this->tmdbError = null;
+
+        $results = array_filter($data['results'] ?? [], fn (array $item): bool => ! empty($item['backdrop_path']) && ($item['media_type'] ?? '') !== 'person'
+        );
+
+        $this->results = array_values(
+            array_map(fn (array $item): array => $this->formatItem($item, $item['media_type']), $results)
+        );
     }
 
     /**
@@ -138,6 +142,10 @@ new class extends Component
                 <div class="w-5 h-5 border-2 border-neutral-600 border-t-fuchsia-500 rounded-full animate-spin"></div>
             </div>
         </div>
+
+        @if ($tmdbError)
+            <p class="mt-3 text-center text-sm text-amber-400/90">{{ $tmdbError }}</p>
+        @endif
 
         {{-- ═══ AUTOCOMPLETE SUGGESTIONS (Arrow Down ile acilir) ═══ --}}
         @if (! empty($results))
