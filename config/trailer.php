@@ -73,7 +73,11 @@ return [
     'brand' => [
         'logo' => public_path('images/avsar-sinema.png'),
         'height' => 54,
-        'white' => true,
+
+        // Logo kendi rengiyle basılır. true yapılırsa beyaza boyanır.
+        // Koyu logo koyu zeminde kaybolmasın diye arkasına açık hâle konur;
+        // bu karar logonun parlaklığından otomatik verilir.
+        'white' => false,
     ],
 
     'defaults' => [

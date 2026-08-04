@@ -61,10 +61,19 @@ final class ArtworkFetcher
      *
      * @return array<int, array{path: string, dil: string|null}>
      */
-    public function backdrops(string $type, int $id, int $limit = 12): array
+    public function backdrops(string $type, int $id, int $limit = 100): array
     {
-        $data = $this->details($type, $id);
-        $images = is_array($data['images']['backdrops'] ?? null) ? $data['images']['backdrops'] : [];
+        $type = in_array($type, ['movie', 'tv'], true) ? $type : 'movie';
+
+        // Ayrı çağrı: fetch() dil süzgeciyle (tr,en,null) geliyor ve listeyi
+        // kırpıyor. Burada dili ne olursa olsun TÜM arka planları istiyoruz.
+        $data = $this->tmdb->remember(
+            "trailer_backdrops_{$type}_{$id}",
+            now()->addHours(6),
+            fn () => $this->tmdb->get("/{$type}/{$id}/images"),
+        );
+
+        $images = is_array($data['backdrops'] ?? null) ? $data['backdrops'] : [];
 
         return collect($images)
             ->filter(fn (mixed $image): bool => is_array($image)

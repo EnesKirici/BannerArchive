@@ -363,8 +363,11 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
 
                 @if($backdropOptions)
                     <div>
-                        <label class="block text-sm font-medium mb-2">Arka plan görseli</label>
-                        <div class="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                        <label class="block text-sm font-medium mb-2">
+                            Arka plan görseli
+                            <span class="text-neutral-600 font-normal">({{ count($backdropOptions) }} görsel)</span>
+                        </label>
+                        <div class="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto pr-1">
                             <button type="button" wire:click="chooseBackdrop(null)"
                                     class="aspect-video rounded-md border text-[11px] text-neutral-400 flex items-center justify-center transition-colors {{ $backdropChoice === null ? 'border-fuchsia-500 text-white' : 'border-white/10 hover:border-white/30' }}">
                                 Otomatik

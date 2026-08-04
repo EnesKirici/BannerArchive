@@ -224,16 +224,36 @@ abstract class AbstractTemplate implements ThumbnailTemplate
             return;
         }
 
-        $logo = $this->brandLogo($path);
+        $brand = $this->brandLogo($path);
 
-        if ($logo === null) {
+        if ($brand === null) {
+            return;
+        }
+
+        $logo = $brand['canvas'];
+
+        // Koyu logo koyu kapakta okunmaz. Rengini bozmak yerine altına beyaz
+        // bir zemin koyuyoruz — sinema markalarının kapaklarda yaptığı da bu.
+        if ($brand['dark']) {
+            $paddingX = 20;
+            $paddingY = 13;
+
+            $plateWidth = $logo->width() + $paddingX * 2;
+            $plateHeight = $logo->height() + $paddingY * 2;
+            $plateX = $corner === 'left' ? 70 : $this->width() - 70 - $plateWidth;
+            $plateY = $this->height() - 44 - $plateHeight;
+
+            $canvas->shadow($plateX, $plateY + 8, $plateWidth, $plateHeight, 14, 30, 0.55);
+            $canvas->place(Canvas::create($plateWidth, $plateHeight, '#ffffff', 1.0)->rounded(14), $plateX, $plateY);
+            $canvas->place($logo, $plateX + $paddingX, $plateY + $paddingY);
+
             return;
         }
 
         $x = $corner === 'left' ? 78 : $this->width() - 78 - $logo->width();
         $y = $this->height() - 52 - $logo->height();
 
-        $canvas->shadowFrom($logo, $x + 2, $y + 7, 20, 0.6);
+        $canvas->shadowFrom($logo, $x + 2, $y + 7, 20, 0.6, '#000000');
         $canvas->place($logo, $x, $y);
     }
 
@@ -244,11 +264,12 @@ abstract class AbstractTemplate implements ThumbnailTemplate
      * yapıldığı için sonuç istek boyunca saklanır. Yalnızca okunarak
      * kullanıldığından paylaşılması güvenli.
      *
-     * @var array<string, Canvas|null>
+     * @var array<string, array{canvas: Canvas, dark: bool}|null>
      */
     private static array $brandCache = [];
 
-    private function brandLogo(string $path): ?Canvas
+    /** @return array{canvas: Canvas, dark: bool}|null */
+    private function brandLogo(string $path): ?array
     {
         $height = (int) config('trailer.brand.height', 54);
         $white = (bool) config('trailer.brand.white', true);
@@ -265,7 +286,12 @@ abstract class AbstractTemplate implements ThumbnailTemplate
                 $logo->recolor('#ffffff');
             }
 
-            return self::$brandCache[$key] = $logo->contain(420, $height);
+            $logo = $logo->contain(420, $height);
+
+            return self::$brandCache[$key] = [
+                'canvas' => $logo,
+                'dark' => Palette::brightness($logo) < 0.45,
+            ];
         } catch (\Throwable $exception) {
             Log::warning('Marka logosu kullanılamadı', ['sebep' => $exception->getMessage()]);
 

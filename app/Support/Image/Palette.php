@@ -92,6 +92,36 @@ final class Palette
         );
     }
 
+    /**
+     * Görselin **opak** piksellerinin ortalama parlaklığı (0 koyu – 1 açık).
+     *
+     * Saydam alanlar sayılmaz; yoksa şeffaf zeminli bir logo hep "koyu"
+     * görünürdü. Logonun arkasına açık mı koyu mu gölge konacağına bununla
+     * karar veriliyor.
+     */
+    public static function brightness(Canvas $image): float
+    {
+        $sample = $image->resized(40, 40)->gd();
+
+        $total = 0.0;
+        $counted = 0;
+
+        for ($y = 0; $y < 40; $y++) {
+            for ($x = 0; $x < 40; $x++) {
+                $color = imagecolorat($sample, $x, $y);
+
+                if ((($color >> 24) & 0x7F) > 40) {
+                    continue;
+                }
+
+                $total += (0.2126 * (($color >> 16) & 0xFF) + 0.7152 * (($color >> 8) & 0xFF) + 0.0722 * ($color & 0xFF)) / 255;
+                $counted++;
+            }
+        }
+
+        return $counted === 0 ? 1.0 : $total / $counted;
+    }
+
     /** Dosya yolundan vurgu rengi; okunamazsa varsayılana düşer. */
     public static function accentFor(?string $imagePath, string $fallback = self::FALLBACK_ACCENT): string
     {
