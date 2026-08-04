@@ -59,7 +59,7 @@ final class PosterFocusTemplate extends AbstractTemplate
 
         $this->ribbon($canvas, $payload->ribbon, $columnX, 468, $accent);
         // Afiş sağda durduğu için logo sol alta gider.
-        $this->brandMark($canvas, $payload->brand, 'left');
+        $this->brandMark($canvas, $payload, 'left');
 
         return $canvas;
     }

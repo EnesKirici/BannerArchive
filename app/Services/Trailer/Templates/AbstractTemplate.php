@@ -216,15 +216,15 @@ abstract class AbstractTemplate implements ThumbnailTemplate
      * $corner afişin bulunduğu tarafa göre seçilir; logo afişin üstüne binmesin.
      * Kaynak logo lacivert olduğu için koyu kapaklarda beyaza boyanır.
      */
-    protected function brandMark(Canvas $canvas, bool $enabled, string $corner = 'right'): void
+    protected function brandMark(Canvas $canvas, ThumbnailPayload $payload, string $corner = 'right'): void
     {
         $path = (string) config('trailer.brand.logo');
 
-        if (! $enabled || ! is_file($path)) {
+        if (! $payload->brand || ! is_file($path)) {
             return;
         }
 
-        $brand = $this->brandLogo($path);
+        $brand = $this->brandLogo($path, $payload->brandWhite);
 
         if ($brand === null) {
             return;
@@ -269,10 +269,9 @@ abstract class AbstractTemplate implements ThumbnailTemplate
     private static array $brandCache = [];
 
     /** @return array{canvas: Canvas, dark: bool}|null */
-    private function brandLogo(string $path): ?array
+    private function brandLogo(string $path, bool $white): ?array
     {
         $height = (int) config('trailer.brand.height', 54);
-        $white = (bool) config('trailer.brand.white', true);
         $key = $path.'|'.(@filemtime($path) ?: 0).'|'.$height.'|'.($white ? 'w' : 'o');
 
         if (array_key_exists($key, self::$brandCache)) {

@@ -21,6 +21,8 @@ final readonly class ThumbnailPayload
         public ?string $accent = null,
         /** Alt köşeye Avşar Sinema logosu basılsın mı? */
         public bool $brand = true,
+        /** Logo beyaza boyansın mı? false = kendi rengi (koyuysa beyaz zeminle). */
+        public bool $brandWhite = false,
         /** Kullanılan logonun dili ('tr', 'en'…). Panelde uyarı göstermek için. */
         public ?string $logoLanguage = null,
     ) {}
@@ -32,6 +34,7 @@ final readonly class ThumbnailPayload
         ?string $meta = null,
         ?string $title = null,
         ?bool $brand = null,
+        ?bool $brandWhite = null,
     ): self {
         return $this->copy(
             title: self::pick($title, $this->title),
@@ -39,6 +42,7 @@ final readonly class ThumbnailPayload
             meta: self::pick($meta, $this->meta),
             accent: self::pick($accent, $this->accent),
             brand: $brand ?? $this->brand,
+            brandWhite: $brandWhite ?? $this->brandWhite,
         );
     }
 
@@ -77,6 +81,7 @@ final readonly class ThumbnailPayload
         ?string $meta = null,
         ?string $accent = null,
         ?bool $brand = null,
+        ?bool $brandWhite = null,
         ?string $backdrop = null,
         bool $setBackdrop = false,
         bool $dropLogo = false,
@@ -92,6 +97,7 @@ final readonly class ThumbnailPayload
             meta: $dropMeta ? null : ($meta ?? $this->meta),
             accent: $dropAccent ? null : ($accent ?? $this->accent),
             brand: $brand ?? $this->brand,
+            brandWhite: $brandWhite ?? $this->brandWhite,
             logoLanguage: $this->logoLanguage,
         );
     }

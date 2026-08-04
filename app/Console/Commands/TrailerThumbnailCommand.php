@@ -20,6 +20,7 @@ class TrailerThumbnailCommand extends Command
         {--ribbon= : Şerit metni}
         {--accent= : Vurgu rengi (#rrggbb); verilmezse afişten çıkarılır}
         {--markasiz : Avşar Sinema logosunu basma}
+        {--beyazlogo : Logoyu kendi rengi yerine beyaza boyayarak bas}
         {--out= : Çıktı klasörü}';
 
     protected $description = 'TMDB verisinden 1280x720 YouTube kapağı üretir';
@@ -38,6 +39,7 @@ class TrailerThumbnailCommand extends Command
             ribbon: $this->option('ribbon'),
             accent: $this->option('accent'),
             brand: ! $this->option('markasiz'),
+            brandWhite: $this->option('beyazlogo') ?: null,
         );
 
         $this->components->twoColumnDetail('<fg=cyan>Yapım</>', $payload->title.($payload->meta ? "  ({$payload->meta})" : ''));

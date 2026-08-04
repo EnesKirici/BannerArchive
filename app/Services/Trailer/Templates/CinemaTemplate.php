@@ -49,7 +49,7 @@ final class CinemaTemplate extends AbstractTemplate
         $this->accentBar($canvas, $centerX, $metaBaseline - 50, $accent, 96, 'center');
 
         $this->ribbon($canvas, $payload->ribbon, $centerX, 484, $accent, 'center');
-        $this->brandMark($canvas, $payload->brand);
+        $this->brandMark($canvas, $payload);
 
         return $canvas;
     }

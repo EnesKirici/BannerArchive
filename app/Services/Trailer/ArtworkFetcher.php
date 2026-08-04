@@ -49,6 +49,7 @@ final class ArtworkFetcher
             ribbon: (string) config('trailer.defaults.ribbon'),
             meta: $this->meta($data),
             accent: config('trailer.defaults.accent'),
+            brandWhite: (bool) config('trailer.brand.white', false),
             logoLanguage: $logo['file'] !== null ? $logo['language'] : null,
         );
     }

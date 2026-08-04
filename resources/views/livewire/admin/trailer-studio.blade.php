@@ -46,6 +46,9 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
 
     public bool $brand = true;
 
+    /** renkli = kendi rengi (koyuysa beyaz zeminli) · beyaz = logo beyaza boyanır */
+    public string $brandStyle = 'renkli';
+
     /** Elle seçilen arka plan (TMDB dosya yolu); null = en iyisi otomatik seçilsin. */
     public ?string $backdropChoice = null;
 
@@ -55,6 +58,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
     public function mount(): void
     {
         $this->accent = (string) config('trailer.defaults.accent', '#00059e');
+        $this->brandStyle = config('trailer.brand.white', false) ? 'beyaz' : 'renkli';
     }
 
     /** @var array<int, array<string, string>> */
@@ -190,7 +194,11 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             'logo' => $payload->logo !== null,
         ];
 
-        $payload = $payload->with(ribbon: $this->ribbonText(), brand: $this->brand);
+        $payload = $payload->with(
+            ribbon: $this->ribbonText(),
+            brand: $this->brand,
+            brandWhite: $this->brandStyle === 'beyaz',
+        );
 
         $payload = match ($this->accentMode) {
             'oto' => $payload->withoutAccent(),
@@ -412,10 +420,29 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     </div>
                 </div>
 
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" wire:model.live="brand" class="accent-fuchsia-500 w-4 h-4">
-                    <span class="text-sm">Avşar Sinema logosu <span class="text-neutral-600">(alt köşe)</span></span>
-                </label>
+                <div>
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" wire:model.live="brand" class="accent-fuchsia-500 w-4 h-4">
+                        <span class="text-sm">Avşar Sinema logosu <span class="text-neutral-600">(alt köşe)</span></span>
+                    </label>
+
+                    @if($brand)
+                        <div class="mt-2 space-y-2">
+                            @foreach([
+                                'renkli' => ['Kendi rengi', 'koyu kapakta beyaz zemin üstünde'],
+                                'beyaz' => ['Beyaz logo', 'zeminsiz, doğrudan kapağın üstünde'],
+                            ] as $key => [$baslik, $aciklama])
+                                <label class="flex items-start gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors {{ $brandStyle === $key ? 'border-fuchsia-500/60 bg-fuchsia-500/5' : 'border-white/5 hover:border-white/15' }}">
+                                    <input type="radio" wire:model.live="brandStyle" value="{{ $key }}" class="accent-fuchsia-500 mt-0.5">
+                                    <span>
+                                        <span class="block text-sm">{{ $baslik }}</span>
+                                        <span class="block text-[11px] text-neutral-500">{{ $aciklama }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
 
                 @if($notice)
                     <p class="text-xs text-amber-400/90 border border-amber-500/20 bg-amber-500/5 rounded-lg px-3 py-2">{{ $notice }}</p>
@@ -425,7 +452,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             {{-- ---------------------------------------------------- Önizlemeler --}}
             <div id="kapaklar" class="xl:col-span-2 space-y-6 relative scroll-mt-24">
 
-                <div wire:loading.flex wire:target="choose,build,chooseBackdrop,ribbonKey,logoMode,showMeta,accentMode,accent,brand,customRibbon"
+                <div wire:loading.flex wire:target="choose,build,chooseBackdrop,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon"
                      class="absolute inset-0 z-10 bg-neutral-950/70 backdrop-blur-sm rounded-xl items-center justify-center">
                     <div class="flex items-center gap-3 text-sm text-neutral-300">
                         <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
