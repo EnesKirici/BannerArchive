@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\Trailer\ThumbnailComposer;
 use App\Services\Trailer\ThumbnailPayload;
 use Illuminate\Support\Facades\File;
+use Livewire\Volt\Volt;
 
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\get;
@@ -44,6 +45,21 @@ test('önizleme ucu depo dışına çıkamaz', function () {
     actingAs(User::factory()->create(['is_admin' => true]))
         ->get('/admin/trailers/onizleme/'.urlencode('../../.env'))
         ->assertNotFound();
+});
+
+test('ayar tercihleri sonraki açılışta hatırlanır', function () {
+    actingAs(User::factory()->create(['is_admin' => true]));
+
+    Volt::test('admin.trailer-studio')
+        ->set('brandStyle', 'beyaz')
+        ->set('ribbonKey', 'dublaj')
+        ->set('showMeta', false);
+
+    // Yeni bir bileşen örneği — tercihler oturumdan geri gelmeli.
+    Volt::test('admin.trailer-studio')
+        ->assertSet('brandStyle', 'beyaz')
+        ->assertSet('ribbonKey', 'dublaj')
+        ->assertSet('showMeta', false);
 });
 
 test('şablon motoru afişten 1280x720 kapak üretir', function () {
