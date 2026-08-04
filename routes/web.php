@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\TrailerPreviewController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TMDBController;
 use App\Http\Controllers\VideoDownloadController;
@@ -45,4 +46,10 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Volt::route('/admin/blocked-ips', 'admin.blocked-ips')->name('admin.blocked-ips');
     Volt::route('/admin/activity-logs', 'admin.activity-logs')->name('admin.activity-logs');
     Volt::route('/admin/security-logs', 'admin.security-logs')->name('admin.security-logs');
+
+    // Kapak Stüdyosu: fragman kapağı üretimi ve önizlemesi
+    Volt::route('/admin/trailers', 'admin.trailer-studio')->name('admin.trailers');
+    Route::get('/admin/trailers/onizleme/{file}', [TrailerPreviewController::class, 'show'])
+        ->name('admin.trailers.preview')
+        ->where('file', '[A-Za-z0-9_\-.]+');
 });

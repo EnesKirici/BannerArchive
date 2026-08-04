@@ -1,0 +1,85 @@
+<?php
+
+namespace App\Services\Trailer;
+
+use App\Services\Trailer\Templates\CinemaTemplate;
+use App\Services\Trailer\Templates\PosterCardTemplate;
+use App\Services\Trailer\Templates\PosterFocusTemplate;
+use App\Services\Trailer\Templates\ThumbnailTemplate;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use RuntimeException;
+
+/**
+ * Şablonları toplayan ve kapağı diske yazan giriş noktası.
+ *
+ * Yeni bir şablon eklemek için ThumbnailTemplate'i uygulayıp yapıcıya eklemek
+ * yeterli; panel listesi ve komut kendiliğinden görür.
+ */
+final class ThumbnailComposer
+{
+    /** @var array<string, ThumbnailTemplate> */
+    private array $templates = [];
+
+    public function __construct(
+        PosterCardTemplate $posterCard,
+        CinemaTemplate $cinema,
+        PosterFocusTemplate $posterFocus,
+    ) {
+        foreach ([$posterCard, $cinema, $posterFocus] as $template) {
+            $this->templates[$template->key()] = $template;
+        }
+    }
+
+    /** @return array<string, string> anahtar => görünen ad */
+    public function options(): array
+    {
+        return array_map(
+            static fn (ThumbnailTemplate $template): string => $template->label(),
+            $this->templates,
+        );
+    }
+
+    /**
+     * Bu içerik için gereken görsellere sahip şablonlar.
+     *
+     * @return array<int, string>
+     */
+    public function availableFor(ThumbnailPayload $payload): array
+    {
+        return array_keys(array_filter(
+            $this->templates,
+            static fn (ThumbnailTemplate $template): bool => $template->supports($payload),
+        ));
+    }
+
+    public function render(ThumbnailPayload $payload, string $key, ?string $directory = null): string
+    {
+        $template = $this->templates[$key]
+            ?? throw new InvalidArgumentException("Bilinmeyen kapak şablonu: {$key}");
+
+        if (! $template->supports($payload)) {
+            throw new RuntimeException("'{$template->label()}' şablonu için gereken görseller eksik.");
+        }
+
+        $directory ??= (string) config('trailer.storage.thumbnails');
+        $name = Str::slug($payload->title) ?: 'kapak';
+
+        return $template->render($payload)->toJpeg(
+            rtrim($directory, '/\\').DIRECTORY_SEPARATOR.$name.'-'.$key.'.jpg',
+            (int) config('trailer.thumbnail.quality', 88),
+        );
+    }
+
+    /** @return array<string, string> anahtar => dosya yolu */
+    public function renderAll(ThumbnailPayload $payload, ?string $directory = null): array
+    {
+        $rendered = [];
+
+        foreach ($this->availableFor($payload) as $key) {
+            $rendered[$key] = $this->render($payload, $key, $directory);
+        }
+
+        return $rendered;
+    }
+}

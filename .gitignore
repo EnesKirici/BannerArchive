@@ -17,6 +17,8 @@
 /public/build
 /public/hot
 /public/storage
+/public/.php-ini
+/public/.php-version
 /storage/*.key
 /storage/pail
 /vendor
