@@ -14,6 +14,16 @@ use RuntimeException;
  */
 final class Canvas
 {
+    /**
+     * Çözülmüş görsellerin istek ömrü boyunca saklandığı önbellek.
+     *
+     * Bir kapak turunda aynı afiş defalarca açılıyor (zemin, kart, renk analizi).
+     * JPEG çözmek pahalı, bellekten kopyalamak neredeyse bedava.
+     *
+     * @var array<string, GdImage>
+     */
+    private static array $decoded = [];
+
     private function __construct(private readonly GdImage $image) {}
 
     /** Boş tuval. $fill verilmezse tamamen şeffaf başlar. */
@@ -37,22 +47,46 @@ final class Canvas
 
     public static function open(string $path): self
     {
-        $binary = @file_get_contents($path);
+        $key = $path.'|'.(@filemtime($path) ?: 0);
 
-        if ($binary === false) {
-            throw new RuntimeException("Görsel okunamadı: {$path}");
+        if (! isset(self::$decoded[$key])) {
+            $binary = @file_get_contents($path);
+
+            if ($binary === false) {
+                throw new RuntimeException("Görsel okunamadı: {$path}");
+            }
+
+            $image = @imagecreatefromstring($binary);
+
+            if ($image === false) {
+                throw new RuntimeException("Görsel çözümlenemedi: {$path}");
+            }
+
+            imagealphablending($image, true);
+            imagesavealpha($image, true);
+
+            self::$decoded[$key] = $image;
         }
 
-        $image = @imagecreatefromstring($binary);
+        return new self(self::duplicate(self::$decoded[$key]));
+    }
 
-        if ($image === false) {
-            throw new RuntimeException("Görsel çözümlenemedi: {$path}");
-        }
+    /** Çözülmüş görsel önbelleğini boşalt (uzun süren işlemler için). */
+    public static function flushDecoded(): void
+    {
+        self::$decoded = [];
+    }
 
-        imagealphablending($image, true);
-        imagesavealpha($image, true);
+    private static function duplicate(GdImage $source): GdImage
+    {
+        $copy = imagecreatetruecolor(imagesx($source), imagesy($source));
 
-        return new self($image);
+        imagealphablending($copy, false);
+        imagesavealpha($copy, true);
+        imagecopy($copy, $source, 0, 0, 0, 0, imagesx($source), imagesy($source));
+        imagealphablending($copy, true);
+
+        return $copy;
     }
 
     public function width(): int
@@ -244,6 +278,30 @@ final class Canvas
 
                     imagesetpixel($this->image, $pixelX, $pixelY, ($faded << 24) | ($color & 0xFFFFFF));
                 }
+            }
+        }
+
+        imagealphablending($this->image, true);
+
+        return $this;
+    }
+
+    /**
+     * Tüm pikselleri tek renge boya, saydamlığı koru.
+     *
+     * Tek renkli logolar için: lacivert marka logosu koyu kapakta kaybolmasın
+     * diye beyaza çevrilir, kenar yumuşatması bozulmaz.
+     */
+    public function recolor(string $hex): self
+    {
+        [$red, $green, $blue] = Palette::rgb($hex);
+        $rgb = ($red << 16) | ($green << 8) | $blue;
+
+        imagealphablending($this->image, false);
+
+        for ($y = 0; $y < $this->height(); $y++) {
+            for ($x = 0; $x < $this->width(); $x++) {
+                imagesetpixel($this->image, $x, $y, (imagecolorat($this->image, $x, $y) & 0x7F000000) | $rgb);
             }
         }
 

@@ -18,8 +18,9 @@ final readonly class ThumbnailPayload
         public ?string $logo = null,
         public string $ribbon = 'Türkçe Altyazılı Fragman',
         public ?string $meta = null,
-        public ?string $tag = null,
         public ?string $accent = null,
+        /** Alt köşeye Avşar Sinema logosu basılsın mı? */
+        public bool $brand = true,
         /** Kullanılan logonun dili ('tr', 'en'…). Panelde uyarı göstermek için. */
         public ?string $logoLanguage = null,
     ) {}
@@ -28,29 +29,41 @@ final readonly class ThumbnailPayload
     public function with(
         ?string $ribbon = null,
         ?string $accent = null,
-        ?string $tag = null,
         ?string $meta = null,
         ?string $title = null,
+        ?bool $brand = null,
     ): self {
         return $this->copy(
             title: self::pick($title, $this->title),
             ribbon: self::pick($ribbon, $this->ribbon),
             meta: self::pick($meta, $this->meta),
-            tag: self::pick($tag, $this->tag),
             accent: self::pick($accent, $this->accent),
+            brand: $brand ?? $this->brand,
         );
     }
 
     /** Logoyu bırak, başlık metnine düş. */
     public function withoutLogo(): self
     {
-        return $this->copy(logo: null, dropLogo: true);
+        return $this->copy(dropLogo: true);
     }
 
     /** Yıl • tür satırını gizle. */
     public function withoutMeta(): self
     {
-        return $this->copy(meta: null, dropMeta: true);
+        return $this->copy(dropMeta: true);
+    }
+
+    /** Arka planı elle seçilen görselle değiştir (null = arka plan yok). */
+    public function withBackdrop(?string $file): self
+    {
+        return $this->copy(backdrop: $file, setBackdrop: true);
+    }
+
+    /** Vurgu rengini temizle ki afişin baskın renginden çıkarılsın. */
+    public function withoutAccent(): self
+    {
+        return $this->copy(dropAccent: true);
     }
 
     public function hasArtwork(): bool
@@ -60,23 +73,25 @@ final readonly class ThumbnailPayload
 
     private function copy(
         ?string $title = null,
-        ?string $logo = null,
         ?string $ribbon = null,
         ?string $meta = null,
-        ?string $tag = null,
         ?string $accent = null,
+        ?bool $brand = null,
+        ?string $backdrop = null,
+        bool $setBackdrop = false,
         bool $dropLogo = false,
         bool $dropMeta = false,
+        bool $dropAccent = false,
     ): self {
         return new self(
             title: $title ?? $this->title,
             poster: $this->poster,
-            backdrop: $this->backdrop,
-            logo: $dropLogo ? null : ($logo ?? $this->logo),
+            backdrop: $setBackdrop ? $backdrop : $this->backdrop,
+            logo: $dropLogo ? null : $this->logo,
             ribbon: $ribbon ?? $this->ribbon,
             meta: $dropMeta ? null : ($meta ?? $this->meta),
-            tag: $tag ?? $this->tag,
-            accent: $accent ?? $this->accent,
+            accent: $dropAccent ? null : ($accent ?? $this->accent),
+            brand: $brand ?? $this->brand,
             logoLanguage: $this->logoLanguage,
         );
     }

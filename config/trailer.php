@@ -59,12 +59,29 @@ return [
         'dublaj' => 'Türkçe Dublaj Fragman',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Marka logosu
+    |--------------------------------------------------------------------------
+    |
+    | Kapağın alt köşesine basılan Avşar Sinema logosu. Kaynak dosya lacivert
+    | olduğu için koyu kapaklarda kaybolur; 'white' açıkken logo beyaza
+    | boyanır (saydamlık korunur).
+    |
+    */
+
+    'brand' => [
+        'logo' => public_path('images/avsar-sinema.png'),
+        'height' => 54,
+        'white' => true,
+    ],
+
     'defaults' => [
         'ribbon' => env('TRAILER_RIBBON', 'Türkçe Altyazılı Fragman'),
-        'tag' => env('TRAILER_TAG'),
 
-        // null → vurgu rengi afişten otomatik çıkarılır
-        'accent' => env('TRAILER_ACCENT'),
+        // Avşar Sinema markasının mavisi. Panelden "afişten otomatik" ya da
+        // serbest renk seçilebilir; buradaki değer varsayılandır.
+        'accent' => env('TRAILER_ACCENT', '#00059e'),
     ],
 
     'storage' => [

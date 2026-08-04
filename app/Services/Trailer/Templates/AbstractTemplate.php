@@ -30,18 +30,17 @@ abstract class AbstractTemplate implements ThumbnailTemplate
         return (string) config("trailer.fonts.{$key}");
     }
 
-    /** Vurgu rengi: elle verilmemişse afişin baskın renginden çıkarılır. */
+    /**
+     * Vurgu rengi: elle verilmemişse afişin baskın renginden çıkarılır.
+     *
+     * Normalde ThumbnailComposer bunu tur başına bir kez hesaplayıp payload'a
+     * yazar; buradaki hesap tekil render'lar için yedektir.
+     */
     protected function accentOf(ThumbnailPayload $payload): string
     {
-        if ($payload->accent !== null && trim($payload->accent) !== '') {
-            return $payload->accent;
-        }
-
-        $source = $payload->poster ?? $payload->backdrop;
-
-        return $source === null
-            ? Palette::FALLBACK_ACCENT
-            : Palette::accent(Canvas::open($source));
+        return $payload->accent !== null && trim($payload->accent) !== ''
+            ? $payload->accent
+            : Palette::accentFor($payload->poster ?? $payload->backdrop);
     }
 
     /** Backdrop varsa onu, yoksa afişin bulanıklaştırılmış hâlini zemin yap. */
@@ -211,18 +210,67 @@ abstract class AbstractTemplate implements ThumbnailTemplate
             ->drawBaseline($canvas, $meta, $x, $baseline, $align);
     }
 
-    /** Sağ alt köşedeki kanal etiketi. */
-    protected function channelTag(Canvas $canvas, ?string $tag): void
+    /**
+     * Alt köşedeki Avşar Sinema logosu.
+     *
+     * $corner afişin bulunduğu tarafa göre seçilir; logo afişin üstüne binmesin.
+     * Kaynak logo lacivert olduğu için koyu kapaklarda beyaza boyanır.
+     */
+    protected function brandMark(Canvas $canvas, bool $enabled, string $corner = 'right'): void
     {
-        if ($tag === null || trim($tag) === '') {
+        $path = (string) config('trailer.brand.logo');
+
+        if (! $enabled || ! is_file($path)) {
             return;
         }
 
-        TextBox::make($this->font('ui'), 24)
-            ->tracking(1.2)
-            ->color('#ffffff')
-            ->shadow(0, 2, '#000000', 0.55)
-            ->drawBaseline($canvas, $tag, $this->width() - 78, $this->height() - 46, 'right');
+        $logo = $this->brandLogo($path);
+
+        if ($logo === null) {
+            return;
+        }
+
+        $x = $corner === 'left' ? 78 : $this->width() - 78 - $logo->width();
+        $y = $this->height() - 52 - $logo->height();
+
+        $canvas->shadowFrom($logo, $x + 2, $y + 7, 20, 0.6);
+        $canvas->place($logo, $x, $y);
+    }
+
+    /**
+     * Kırpılmış, beyaza boyanmış ve ölçeklenmiş marka logosu.
+     *
+     * Üç şablonda da aynı logo kullanılıyor; kırpma ve boyama piksel piksel
+     * yapıldığı için sonuç istek boyunca saklanır. Yalnızca okunarak
+     * kullanıldığından paylaşılması güvenli.
+     *
+     * @var array<string, Canvas|null>
+     */
+    private static array $brandCache = [];
+
+    private function brandLogo(string $path): ?Canvas
+    {
+        $height = (int) config('trailer.brand.height', 54);
+        $white = (bool) config('trailer.brand.white', true);
+        $key = $path.'|'.(@filemtime($path) ?: 0).'|'.$height.'|'.($white ? 'w' : 'o');
+
+        if (array_key_exists($key, self::$brandCache)) {
+            return self::$brandCache[$key];
+        }
+
+        try {
+            $logo = Canvas::open($path)->trimTransparent();
+
+            if ($white) {
+                $logo->recolor('#ffffff');
+            }
+
+            return self::$brandCache[$key] = $logo->contain(420, $height);
+        } catch (\Throwable $exception) {
+            Log::warning('Marka logosu kullanılamadı', ['sebep' => $exception->getMessage()]);
+
+            return self::$brandCache[$key] = null;
+        }
     }
 
     /** Vurgu renginde kısa bir çizgi — metin bloğunu başlatan görsel işaret. */

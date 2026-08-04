@@ -19,7 +19,7 @@ class TrailerThumbnailCommand extends Command
         {--template= : Yalnızca bu şablonu üret}
         {--ribbon= : Şerit metni}
         {--accent= : Vurgu rengi (#rrggbb); verilmezse afişten çıkarılır}
-        {--tag= : Sağ alt köşe etiketi}
+        {--markasiz : Avşar Sinema logosunu basma}
         {--out= : Çıktı klasörü}';
 
     protected $description = 'TMDB verisinden 1280x720 YouTube kapağı üretir';
@@ -37,7 +37,7 @@ class TrailerThumbnailCommand extends Command
         $payload = $payload->with(
             ribbon: $this->option('ribbon'),
             accent: $this->option('accent'),
-            tag: $this->option('tag'),
+            brand: ! $this->option('markasiz'),
         );
 
         $this->components->twoColumnDetail('<fg=cyan>Yapım</>', $payload->title.($payload->meta ? "  ({$payload->meta})" : ''));
@@ -48,7 +48,27 @@ class TrailerThumbnailCommand extends Command
         ]));
 
         $requested = $this->option('template');
-        $keys = $requested ? [$requested] : $composer->availableFor($payload);
+
+        // Tek şablon istenmediyse renderAll: vurgu rengini bir kez hesaplar.
+        if (! $requested) {
+            $started = microtime(true);
+            $rendered = $composer->renderAll($payload, $this->option('out') ?: null);
+
+            $this->newLine();
+            $this->table(
+                ['Şablon', 'Boyut', 'Dosya'],
+                array_map(
+                    fn (string $key, string $path): array => [$key, number_format(filesize($path) / 1024).' KB', $path],
+                    array_keys($rendered),
+                    $rendered,
+                ),
+            );
+            $this->components->info('Toplam '.number_format((microtime(true) - $started) * 1000).' ms');
+
+            return self::SUCCESS;
+        }
+
+        $keys = [$requested];
 
         if ($keys === []) {
             $this->components->error('Kapak üretmek için yeterli görsel yok.');

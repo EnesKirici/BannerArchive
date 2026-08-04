@@ -6,6 +6,8 @@ use App\Services\Trailer\Templates\CinemaTemplate;
 use App\Services\Trailer\Templates\PosterCardTemplate;
 use App\Services\Trailer\Templates\PosterFocusTemplate;
 use App\Services\Trailer\Templates\ThumbnailTemplate;
+use App\Support\Image\Canvas;
+use App\Support\Image\Palette;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -74,11 +76,20 @@ final class ThumbnailComposer
     /** @return array<string, string> anahtar => dosya yolu */
     public function renderAll(ThumbnailPayload $payload, ?string $directory = null): array
     {
+        // Vurgu rengi afişin piksellerinden çıkarılıyor; üç şablon için üç kez
+        // değil, tur başına bir kez hesaplansın.
+        if ($payload->accent === null || trim($payload->accent) === '') {
+            $payload = $payload->with(accent: Palette::accentFor($payload->poster ?? $payload->backdrop));
+        }
+
         $rendered = [];
 
         foreach ($this->availableFor($payload) as $key) {
             $rendered[$key] = $this->render($payload, $key, $directory);
         }
+
+        // Çözülmüş görseller bellekte tutuluyordu; tur bitti, bırakalım.
+        Canvas::flushDecoded();
 
         return $rendered;
     }

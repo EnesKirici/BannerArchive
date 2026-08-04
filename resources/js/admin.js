@@ -1,5 +1,7 @@
 // Admin panel JavaScript
 
+import './livewire-session';
+
 document.addEventListener('DOMContentLoaded', () => {
     // Auto-hide alerts after 5 seconds
     const alerts = document.querySelectorAll('[class*="bg-emerald"], [class*="bg-red"]');

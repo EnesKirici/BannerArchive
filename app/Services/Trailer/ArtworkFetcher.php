@@ -27,19 +27,9 @@ final class ArtworkFetcher
 
     public function fetch(string $type, int $id): ?ThumbnailPayload
     {
-        $type = in_array($type, ['movie', 'tv'], true) ? $type : 'movie';
+        $data = $this->details($type, $id);
 
-        $data = $this->tmdb->remember(
-            "trailer_artwork_{$type}_{$id}",
-            now()->addHours(6),
-            fn () => $this->tmdb->get("/{$type}/{$id}", [
-                'language' => 'tr-TR',
-                'append_to_response' => 'images',
-                'include_image_language' => 'tr,en,null',
-            ]),
-        );
-
-        if (! is_array($data) || $data === []) {
+        if ($data === null) {
             return null;
         }
 
@@ -58,10 +48,61 @@ final class ArtworkFetcher
             logo: $logo['file'],
             ribbon: (string) config('trailer.defaults.ribbon'),
             meta: $this->meta($data),
-            tag: config('trailer.defaults.tag'),
             accent: config('trailer.defaults.accent'),
             logoLanguage: $logo['file'] !== null ? $logo['language'] : null,
         );
+    }
+
+    /**
+     * Panelde elle seçilebilsin diye tüm arka plan seçenekleri.
+     *
+     * Yazısız (dili olmayan) görseller başa alınır: film adını logo olarak
+     * biz basıyoruz, üzerinde yazı olan backdrop'lar çakışır.
+     *
+     * @return array<int, array{path: string, dil: string|null}>
+     */
+    public function backdrops(string $type, int $id, int $limit = 12): array
+    {
+        $data = $this->details($type, $id);
+        $images = is_array($data['images']['backdrops'] ?? null) ? $data['images']['backdrops'] : [];
+
+        return collect($images)
+            ->filter(fn (mixed $image): bool => is_array($image)
+                && is_string($image['file_path'] ?? null)
+                && in_array(strtolower(pathinfo($image['file_path'], PATHINFO_EXTENSION)), self::DECODABLE, true))
+            ->sortBy(fn (array $image): array => [
+                ($image['iso_639_1'] ?? null) === null ? 0 : 1,
+                -(float) ($image['vote_average'] ?? 0),
+            ])
+            ->take($limit)
+            ->map(fn (array $image): array => [
+                'path' => (string) $image['file_path'],
+                'dil' => $image['iso_639_1'] ?? null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * TMDB kaydı — görselleriyle birlikte, 6 saat önbellekli.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function details(string $type, int $id): ?array
+    {
+        $type = in_array($type, ['movie', 'tv'], true) ? $type : 'movie';
+
+        $data = $this->tmdb->remember(
+            "trailer_artwork_{$type}_{$id}",
+            now()->addHours(6),
+            fn () => $this->tmdb->get("/{$type}/{$id}", [
+                'language' => 'tr-TR',
+                'append_to_response' => 'images',
+                'include_image_language' => 'tr,en,null',
+            ]),
+        );
+
+        return is_array($data) && $data !== [] ? $data : null;
     }
 
     /**

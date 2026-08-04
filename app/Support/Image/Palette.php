@@ -92,6 +92,20 @@ final class Palette
         );
     }
 
+    /** Dosya yolundan vurgu rengi; okunamazsa varsayılana düşer. */
+    public static function accentFor(?string $imagePath, string $fallback = self::FALLBACK_ACCENT): string
+    {
+        if ($imagePath === null || ! is_file($imagePath)) {
+            return $fallback;
+        }
+
+        try {
+            return self::accent(Canvas::open($imagePath), $fallback);
+        } catch (\Throwable) {
+            return $fallback;
+        }
+    }
+
     /**
      * Görselin en baskın *canlı* rengini bul.
      *

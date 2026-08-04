@@ -39,9 +39,23 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
 
     public bool $showMeta = true;
 
+    /** marka = sabit kurumsal renk · oto = afişten çıkar · ozel = elle seçilen */
+    public string $accentMode = 'marka';
+
     public string $accent = '';
 
-    public string $tag = '';
+    public bool $brand = true;
+
+    /** Elle seçilen arka plan (TMDB dosya yolu); null = en iyisi otomatik seçilsin. */
+    public ?string $backdropChoice = null;
+
+    /** @var array<int, array{path: string, dil: string|null}> */
+    public array $backdropOptions = [];
+
+    public function mount(): void
+    {
+        $this->accent = (string) config('trailer.defaults.accent', '#00059e');
+    }
 
     /** @var array<int, array<string, string>> */
     public array $thumbnails = [];
@@ -115,6 +129,21 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->selectedId = $id;
         $this->selectedType = (string) $chosen['type'];
         $this->selectedTitle = (string) $chosen['title'];
+        $this->backdropChoice = null;
+
+        $artwork = app(ArtworkFetcher::class);
+        $this->backdropOptions = $artwork->backdrops($this->selectedType, $id);
+
+        $this->build($artwork, app(ThumbnailComposer::class));
+
+        // Kapaklar sayfanın altında üretiliyor; kullanıcıyı oraya götür.
+        // Kısa gecikme, hedef bölümün DOM'a yerleşmesini bekliyor.
+        $this->js('setTimeout(() => document.getElementById("kapaklar")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80)');
+    }
+
+    public function chooseBackdrop(?string $path): void
+    {
+        $this->backdropChoice = $path;
 
         $this->build(app(ArtworkFetcher::class), app(ThumbnailComposer::class));
     }
@@ -147,6 +176,13 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             return;
         }
 
+        // Arka plan elle seçildiyse TMDB'nin sıraladığını değil, onu kullan.
+        if ($this->backdropChoice !== null) {
+            $payload = $payload->withBackdrop(
+                $artwork->download($this->backdropChoice, (string) config('trailer.sizes.backdrop'))
+            );
+        }
+
         $this->logoLanguage = $payload->logoLanguage;
         $this->artwork = [
             'afiş' => $payload->poster !== null,
@@ -154,7 +190,13 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             'logo' => $payload->logo !== null,
         ];
 
-        $payload = $payload->with(ribbon: $this->ribbonText(), accent: $this->accent, tag: $this->tag);
+        $payload = $payload->with(ribbon: $this->ribbonText(), brand: $this->brand);
+
+        $payload = match ($this->accentMode) {
+            'oto' => $payload->withoutAccent(),
+            'ozel' => $payload->with(accent: $this->accent),
+            default => $payload->with(accent: (string) config('trailer.defaults.accent')),
+        };
 
         if (! $this->showMeta) {
             $payload = $payload->withoutMeta();
@@ -175,25 +217,27 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             @unlink($stale);
         }
 
-        $built = [];
+        try {
+            // renderAll: vurgu rengini üç şablon için bir kez hesaplar.
+            $rendered = $composer->renderAll($payload, $directory);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $this->error = 'Kapak üretilemedi: '.$exception->getMessage();
 
-        foreach ($composer->availableFor($payload) as $key) {
-            try {
-                $path = $composer->render($payload, $key, $directory);
-
-                $built[] = [
-                    'key' => $key,
-                    'label' => $composer->options()[$key] ?? $key,
-                    'file' => basename($path),
-                    'size' => number_format(filesize($path) / 1024).' KB',
-                ];
-            } catch (\Throwable $exception) {
-                report($exception);
-                $this->error = 'Kapak üretilemedi: '.$exception->getMessage();
-            }
+            return;
         }
 
-        $this->thumbnails = $built;
+        $labels = $composer->options();
+
+        $this->thumbnails = collect($rendered)
+            ->map(fn (string $path, string $key): array => [
+                'key' => $key,
+                'label' => $labels[$key] ?? $key,
+                'file' => basename($path),
+                'size' => number_format(filesize($path) / 1024).' KB',
+            ])
+            ->values()
+            ->all();
         $this->renderedAt = now()->timestamp;
     }
 
@@ -317,20 +361,58 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     <span class="text-sm">Yıl • tür satırını göster</span>
                 </label>
 
+                @if($backdropOptions)
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Arka plan görseli</label>
+                        <div class="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                            <button type="button" wire:click="chooseBackdrop(null)"
+                                    class="aspect-video rounded-md border text-[11px] text-neutral-400 flex items-center justify-center transition-colors {{ $backdropChoice === null ? 'border-fuchsia-500 text-white' : 'border-white/10 hover:border-white/30' }}">
+                                Otomatik
+                            </button>
+                            @foreach($backdropOptions as $option)
+                                <button type="button" wire:click="chooseBackdrop('{{ $option['path'] }}')" wire:key="arkaplan-{{ $loop->index }}"
+                                        class="relative aspect-video rounded-md overflow-hidden border transition-colors {{ $backdropChoice === $option['path'] ? 'border-fuchsia-500' : 'border-white/10 hover:border-white/30' }}">
+                                    <img src="https://image.tmdb.org/t/p/w300{{ $option['path'] }}" alt="" class="w-full h-full object-cover">
+                                    @if($option['dil'])
+                                        <span class="absolute top-1 right-1 px-1 rounded bg-black/70 text-[9px] uppercase">{{ $option['dil'] }}</span>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                        <p class="mt-1.5 text-[11px] text-neutral-600">Dil rozetli olanların üzerinde yazı vardır, logoyla çakışabilir.</p>
+                    </div>
+                @endif
+
                 <div>
                     <label class="block text-sm font-medium mb-2">Şerit rengi</label>
-                    <div class="flex gap-2">
-                        <input wire:model.blur="accent" type="text" placeholder="boş = afişten otomatik"
-                               class="flex-1 bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-fuchsia-500/60">
-                        <input wire:model.blur="accent" type="color" class="w-11 h-[38px] bg-neutral-950 border border-white/10 rounded-lg cursor-pointer">
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors {{ $accentMode === 'marka' ? 'border-fuchsia-500/60 bg-fuchsia-500/5' : 'border-white/5 hover:border-white/15' }}">
+                            <input type="radio" wire:model.live="accentMode" value="marka" class="accent-fuchsia-500">
+                            <span class="w-4 h-4 rounded shrink-0" style="background: {{ config('trailer.defaults.accent') }}"></span>
+                            <span class="text-sm">Marka mavisi</span>
+                        </label>
+                        <label class="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors {{ $accentMode === 'oto' ? 'border-fuchsia-500/60 bg-fuchsia-500/5' : 'border-white/5 hover:border-white/15' }}">
+                            <input type="radio" wire:model.live="accentMode" value="oto" class="accent-fuchsia-500">
+                            <span class="text-sm">Afişten otomatik</span>
+                        </label>
+                        <label class="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors {{ $accentMode === 'ozel' ? 'border-fuchsia-500/60 bg-fuchsia-500/5' : 'border-white/5 hover:border-white/15' }}">
+                            <input type="radio" wire:model.live="accentMode" value="ozel" class="accent-fuchsia-500">
+                            <span class="text-sm">Özel renk</span>
+                        </label>
+                        @if($accentMode === 'ozel')
+                            <div class="flex gap-2">
+                                <input wire:model.blur="accent" type="text" placeholder="#00059e"
+                                       class="flex-1 bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-fuchsia-500/60">
+                                <input wire:model.blur="accent" type="color" class="w-11 h-[38px] bg-neutral-950 border border-white/10 rounded-lg cursor-pointer">
+                            </div>
+                        @endif
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium mb-2">Kanal etiketi <span class="text-neutral-600 font-normal">(sağ alt köşe)</span></label>
-                    <input wire:model.blur="tag" type="text" placeholder="boş = gösterme"
-                           class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
-                </div>
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" wire:model.live="brand" class="accent-fuchsia-500 w-4 h-4">
+                    <span class="text-sm">Avşar Sinema logosu <span class="text-neutral-600">(alt köşe)</span></span>
+                </label>
 
                 @if($notice)
                     <p class="text-xs text-amber-400/90 border border-amber-500/20 bg-amber-500/5 rounded-lg px-3 py-2">{{ $notice }}</p>
@@ -338,9 +420,9 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             </div>
 
             {{-- ---------------------------------------------------- Önizlemeler --}}
-            <div class="xl:col-span-2 space-y-6 relative">
+            <div id="kapaklar" class="xl:col-span-2 space-y-6 relative scroll-mt-24">
 
-                <div wire:loading.flex wire:target="choose,build,ribbonKey,logoMode,showMeta,accent,tag,customRibbon"
+                <div wire:loading.flex wire:target="choose,build,chooseBackdrop,ribbonKey,logoMode,showMeta,accentMode,accent,brand,customRibbon"
                      class="absolute inset-0 z-10 bg-neutral-950/70 backdrop-blur-sm rounded-xl items-center justify-center">
                     <div class="flex items-center gap-3 text-sm text-neutral-300">
                         <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">

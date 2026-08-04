@@ -30,6 +30,14 @@ Route::middleware(\App\Http\Middleware\EnableBfCache::class)->group(function () 
     Route::get('/tools/video-downloader/file/{token}', [VideoDownloadController::class, 'download'])->name('tools.video-downloader.file')->middleware('throttle:download');
 });
 
+// Oturum zaman aşımından sonra Livewire'ın "Page Expired" uyarısı göstermek
+// yerine sessizce tazelenebilmesi için. Bkz. resources/js/livewire-session.js
+Route::get('/csrf-token', fn () => response()
+    ->json(['token' => csrf_token()])
+    ->header('Cache-Control', 'no-store, private'))
+    ->middleware('throttle:60,1')
+    ->name('csrf.token');
+
 // Auth Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
