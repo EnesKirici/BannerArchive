@@ -64,24 +64,41 @@ final class ArtworkFetcher
      */
     public function backdrops(string $type, int $id, int $limit = 100): array
     {
-        $type = in_array($type, ['movie', 'tv'], true) ? $type : 'movie';
+        // Yazısız (dilsiz) olanlar başa: film adını logo olarak biz basıyoruz.
+        return $this->pickable($this->allImages($type, $id)['backdrops'] ?? [], $limit, fn (?string $language): int => $language === null ? 0 : 1);
+    }
 
-        // Ayrı çağrı: fetch() dil süzgeciyle (tr,en,null) geliyor ve listeyi
-        // kırpıyor. Burada dili ne olursa olsun TÜM arka planları istiyoruz.
-        $data = $this->tmdb->remember(
-            "trailer_backdrops_{$type}_{$id}",
-            now()->addHours(6),
-            fn () => $this->tmdb->get("/{$type}/{$id}/images"),
-        );
+    /**
+     * Elle seçilebilsin diye tüm film adı logoları (title treatment).
+     *
+     * Sıra: Türkçe, İngilizce, sonra diğerleri.
+     *
+     * @return array<int, array{path: string, dil: string|null}>
+     */
+    public function logos(string $type, int $id, int $limit = 40): array
+    {
+        return $this->pickable($this->allImages($type, $id)['logos'] ?? [], $limit, fn (?string $language): int => match ($language) {
+            'tr' => 0,
+            'en' => 1,
+            default => 2,
+        });
+    }
 
-        $images = is_array($data['backdrops'] ?? null) ? $data['backdrops'] : [];
-
-        return collect($images)
+    /**
+     * Ortak süzgeç: GD'nin açabildiklerini al, verilen dil önceliğine göre sırala.
+     *
+     * @param  mixed  $images
+     * @param  callable(string|null): int  $rank
+     * @return array<int, array{path: string, dil: string|null}>
+     */
+    private function pickable(mixed $images, int $limit, callable $rank): array
+    {
+        return collect(is_array($images) ? $images : [])
             ->filter(fn (mixed $image): bool => is_array($image)
                 && is_string($image['file_path'] ?? null)
                 && in_array(strtolower(pathinfo($image['file_path'], PATHINFO_EXTENSION)), self::DECODABLE, true))
             ->sortBy(fn (array $image): array => [
-                ($image['iso_639_1'] ?? null) === null ? 0 : 1,
+                $rank($image['iso_639_1'] ?? null),
                 -(float) ($image['vote_average'] ?? 0),
             ])
             ->take($limit)
@@ -91,6 +108,28 @@ final class ArtworkFetcher
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Yapımın TÜM görselleri — dil süzgeci olmadan.
+     *
+     * fetch() `include_image_language=tr,en,null` ile çağırıyor ve diğer
+     * dillerdeki görseller listeye hiç girmiyor. Seçim ekranında hepsini
+     * göstermek için ayrı, süzgeçsiz bir çağrı gerekiyor.
+     *
+     * @return array<string, mixed>
+     */
+    private function allImages(string $type, int $id): array
+    {
+        $type = in_array($type, ['movie', 'tv'], true) ? $type : 'movie';
+
+        $data = $this->tmdb->remember(
+            "trailer_images_{$type}_{$id}",
+            now()->addHours(6),
+            fn () => $this->tmdb->get("/{$type}/{$id}/images"),
+        );
+
+        return is_array($data) ? $data : [];
     }
 
     /**

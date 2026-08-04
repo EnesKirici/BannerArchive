@@ -64,6 +64,12 @@ final readonly class ThumbnailPayload
         return $this->copy(backdrop: $file, setBackdrop: true);
     }
 
+    /** Film adı logosunu elle seçilenle değiştir. */
+    public function withLogo(?string $file): self
+    {
+        return $this->copy(logo: $file, setLogo: true);
+    }
+
     /** Vurgu rengini temizle ki afişin baskın renginden çıkarılsın. */
     public function withoutAccent(): self
     {
@@ -84,6 +90,8 @@ final readonly class ThumbnailPayload
         ?bool $brandWhite = null,
         ?string $backdrop = null,
         bool $setBackdrop = false,
+        ?string $logo = null,
+        bool $setLogo = false,
         bool $dropLogo = false,
         bool $dropMeta = false,
         bool $dropAccent = false,
@@ -92,7 +100,7 @@ final readonly class ThumbnailPayload
             title: $title ?? $this->title,
             poster: $this->poster,
             backdrop: $setBackdrop ? $backdrop : $this->backdrop,
-            logo: $dropLogo ? null : $this->logo,
+            logo: $dropLogo ? null : ($setLogo ? $logo : $this->logo),
             ribbon: $ribbon ?? $this->ribbon,
             meta: $dropMeta ? null : ($meta ?? $this->meta),
             accent: $dropAccent ? null : ($accent ?? $this->accent),

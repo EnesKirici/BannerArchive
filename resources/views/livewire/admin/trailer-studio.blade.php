@@ -14,6 +14,7 @@ use App\Services\TmdbClient;
 use App\Services\Trailer\ArtworkFetcher;
 use App\Services\Trailer\ThumbnailComposer;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Session;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -30,23 +31,37 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
 
     public string $selectedTitle = '';
 
+    /*
+    | Aşağıdaki tercihler #[Session] ile saklanıyor: bir kez seçilen ayar
+    | sonraki filmlerde ve sonraki girişlerde aynı kalsın diye. Filme özgü
+    | olanlar (seçilen arka plan/logo) bilinçli olarak saklanmıyor.
+    */
+
+    #[Session]
     public string $ribbonKey = 'altyazi';
 
+    #[Session]
     public string $customRibbon = '';
 
     /** auto = TMDB ne verdiyse · tr = sadece Türkçe logo · text = logo yerine başlık */
+    #[Session]
     public string $logoMode = 'auto';
 
+    #[Session]
     public bool $showMeta = true;
 
     /** marka = sabit kurumsal renk · oto = afişten çıkar · ozel = elle seçilen */
+    #[Session]
     public string $accentMode = 'marka';
 
+    #[Session]
     public string $accent = '';
 
+    #[Session]
     public bool $brand = true;
 
     /** renkli = kendi rengi (koyuysa beyaz zeminli) · beyaz = logo beyaza boyanır */
+    #[Session]
     public string $brandStyle = 'renkli';
 
     /** Elle seçilen arka plan (TMDB dosya yolu); null = en iyisi otomatik seçilsin. */
@@ -55,10 +70,18 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
     /** @var array<int, array{path: string, dil: string|null}> */
     public array $backdropOptions = [];
 
+    /** Elle seçilen film adı logosu; null = "Film adı nasıl yazılsın" kuralları geçerli. */
+    public ?string $logoChoice = null;
+
+    /** @var array<int, array{path: string, dil: string|null}> */
+    public array $logoOptions = [];
+
     public function mount(): void
     {
-        $this->accent = (string) config('trailer.defaults.accent', '#00059e');
-        $this->brandStyle = config('trailer.brand.white', false) ? 'beyaz' : 'renkli';
+        // Oturumdan gelen bir tercih varsa ona dokunma; yoksa yapılandırmadan doldur.
+        if ($this->accent === '') {
+            $this->accent = (string) config('trailer.defaults.accent', '#00059e');
+        }
     }
 
     /** @var array<int, array<string, string>> */
@@ -134,9 +157,11 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->selectedType = (string) $chosen['type'];
         $this->selectedTitle = (string) $chosen['title'];
         $this->backdropChoice = null;
+        $this->logoChoice = null;
 
         $artwork = app(ArtworkFetcher::class);
         $this->backdropOptions = $artwork->backdrops($this->selectedType, $id);
+        $this->logoOptions = $artwork->logos($this->selectedType, $id);
 
         $this->build($artwork, app(ThumbnailComposer::class));
 
@@ -148,6 +173,13 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
     public function chooseBackdrop(?string $path): void
     {
         $this->backdropChoice = $path;
+
+        $this->build(app(ArtworkFetcher::class), app(ThumbnailComposer::class));
+    }
+
+    public function chooseLogo(?string $path): void
+    {
+        $this->logoChoice = $path;
 
         $this->build(app(ArtworkFetcher::class), app(ThumbnailComposer::class));
     }
@@ -187,7 +219,19 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             );
         }
 
-        $this->logoLanguage = $payload->logoLanguage;
+        // Logo da elle seçilebiliyor; seçildiyse "film adı nasıl yazılsın"
+        // kuralları devreye girmez, doğrudan seçilen kullanılır.
+        if ($this->logoChoice !== null) {
+            $payload = $payload->withLogo(
+                $artwork->download($this->logoChoice, (string) config('trailer.sizes.logo'))
+            );
+
+            $chosenLogo = collect($this->logoOptions)->firstWhere('path', $this->logoChoice);
+            $this->logoLanguage = is_array($chosenLogo) ? ($chosenLogo['dil'] ?? null) : null;
+        } else {
+            $this->logoLanguage = $payload->logoLanguage;
+        }
+
         $this->artwork = [
             'afiş' => $payload->poster !== null,
             'backdrop' => $payload->backdrop !== null,
@@ -210,7 +254,9 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             $payload = $payload->withoutMeta();
         }
 
-        if ($this->logoMode === 'text') {
+        if ($this->logoChoice !== null) {
+            $this->notice = 'Logo elle seçildi — otomatik kurallar uygulanmadı.';
+        } elseif ($this->logoMode === 'text') {
             $payload = $payload->withoutLogo();
         } elseif ($this->logoMode === 'tr' && $payload->logoLanguage !== 'tr') {
             $payload = $payload->withoutLogo();
@@ -360,7 +406,45 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                         @endforeach
                     </div>
                     @if($logoLanguage)
-                        <p class="mt-2 text-xs text-neutral-500">Bulunan logo dili: <span class="font-mono uppercase">{{ $logoLanguage }}</span></p>
+                        <p class="mt-2 text-xs text-neutral-500">
+                            Kullanılan logo dili: <span class="font-mono uppercase">{{ $logoLanguage }}</span>
+                        </p>
+                    @endif
+
+                    {{-- TMDB'nin seçtiği logo kötüyse elle seçim. Liste uzun olduğu
+                         için kapalı başlar, Alpine ile açılır. --}}
+                    @if($logoOptions)
+                        <div x-data="{ acik: false }" class="mt-3">
+                            <button type="button" x-on:click="acik = !acik"
+                                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-white/5 hover:border-white/15 transition-colors text-left">
+                                <span class="text-sm">
+                                    Logoyu kendim seçeyim
+                                    <span class="text-neutral-600">({{ count($logoOptions) }})</span>
+                                </span>
+                                <svg class="w-4 h-4 text-neutral-500 transition-transform" x-bind:class="acik ? 'rotate-180' : ''"
+                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+
+                            <div x-show="acik" style="display: none" x-transition
+                                 class="mt-2 grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                                <button type="button" wire:click="chooseLogo(null)"
+                                        class="h-16 rounded-md border text-[11px] flex items-center justify-center transition-colors {{ $logoChoice === null ? 'border-fuchsia-500 text-white' : 'border-white/10 text-neutral-400 hover:border-white/30' }}">
+                                    Otomatik
+                                </button>
+                                @foreach($logoOptions as $option)
+                                    {{-- Zemin gradyanlı: hem beyaz hem koyu logolar görünsün --}}
+                                    <button type="button" wire:click="chooseLogo('{{ $option['path'] }}')" wire:key="logo-{{ $loop->index }}"
+                                            class="relative h-16 rounded-md border p-2 flex items-center justify-center bg-gradient-to-br from-neutral-400 to-neutral-800 transition-colors {{ $logoChoice === $option['path'] ? 'border-fuchsia-500' : 'border-white/10 hover:border-white/30' }}">
+                                        <img src="https://image.tmdb.org/t/p/w300{{ $option['path'] }}" alt="" class="max-h-full max-w-full object-contain">
+                                        @if($option['dil'])
+                                            <span class="absolute top-1 right-1 px-1 rounded bg-black/70 text-[9px] uppercase text-white">{{ $option['dil'] }}</span>
+                                        @endif
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
                     @endif
                 </div>
 
@@ -452,7 +536,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             {{-- ---------------------------------------------------- Önizlemeler --}}
             <div id="kapaklar" class="xl:col-span-2 space-y-6 relative scroll-mt-24">
 
-                <div wire:loading.flex wire:target="choose,build,chooseBackdrop,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon"
+                <div wire:loading.flex wire:target="choose,build,chooseBackdrop,chooseLogo,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon"
                      class="absolute inset-0 z-10 bg-neutral-950/70 backdrop-blur-sm rounded-xl items-center justify-center">
                     <div class="flex items-center gap-3 text-sm text-neutral-300">
                         <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
