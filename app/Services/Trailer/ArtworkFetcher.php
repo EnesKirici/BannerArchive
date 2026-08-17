@@ -87,7 +87,6 @@ final class ArtworkFetcher
     /**
      * Ortak süzgeç: GD'nin açabildiklerini al, verilen dil önceliğine göre sırala.
      *
-     * @param  mixed  $images
      * @param  callable(string|null): int  $rank
      * @return array<int, array{path: string, dil: string|null}>
      */

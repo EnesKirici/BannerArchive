@@ -36,6 +36,22 @@ return [
         'quality' => 88,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Shorts kapağı (dikey / telefon modu)
+    |--------------------------------------------------------------------------
+    |
+    | YouTube Shorts 9:16 dikey görüntü kullanır; 1080x1920 önerilen ölçüdür.
+    | Şablonlar hangi biçimde olduklarını format() ile bildirir, ölçüler
+    | buradan okunur.
+    |
+    */
+
+    'shorts' => [
+        'width' => 1080,
+        'height' => 1920,
+    ],
+
     'fonts' => [
         'display' => public_path('fonts/Anton-Regular.ttf'),
         'heavy' => public_path('fonts/ArchivoBlack-Regular.ttf'),

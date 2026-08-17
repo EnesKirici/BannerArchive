@@ -23,7 +23,7 @@ class TrailerThumbnailCommand extends Command
         {--beyazlogo : Logoyu kendi rengi yerine beyaza boyayarak bas}
         {--out= : Çıktı klasörü}';
 
-    protected $description = 'TMDB verisinden 1280x720 YouTube kapağı üretir';
+    protected $description = 'TMDB verisinden YouTube (1280x720) ve Shorts (1080x1920) kapakları üretir';
 
     public function handle(ArtworkFetcher $artwork, ThumbnailComposer $composer): int
     {

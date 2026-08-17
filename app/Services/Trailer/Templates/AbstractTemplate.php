@@ -15,14 +15,23 @@ use Illuminate\Support\Facades\Log;
  */
 abstract class AbstractTemplate implements ThumbnailTemplate
 {
+    public function format(): string
+    {
+        return 'video';
+    }
+
     protected function width(): int
     {
-        return (int) config('trailer.thumbnail.width', 1280);
+        return $this->format() === 'shorts'
+            ? (int) config('trailer.shorts.width', 1080)
+            : (int) config('trailer.thumbnail.width', 1280);
     }
 
     protected function height(): int
     {
-        return (int) config('trailer.thumbnail.height', 720);
+        return $this->format() === 'shorts'
+            ? (int) config('trailer.shorts.height', 1920)
+            : (int) config('trailer.thumbnail.height', 720);
     }
 
     protected function font(string $key): string

@@ -13,6 +13,9 @@ interface ThumbnailTemplate
     /** Panelde gösterilecek Türkçe ad. */
     public function label(): string;
 
+    /** Kapağın hedef biçimi: 'video' (16:9) ya da 'shorts' (9:16 dikey). */
+    public function format(): string;
+
     /** Bu şablonun ihtiyaç duyduğu görseller elimizde var mı? */
     public function supports(ThumbnailPayload $payload): bool;
 
