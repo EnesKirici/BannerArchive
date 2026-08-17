@@ -62,7 +62,7 @@ test('ayar tercihleri sonraki açılışta hatırlanır', function () {
         ->assertSet('showMeta', false);
 });
 
-test('şablon motoru afişten 1280x720 kapak üretir', function () {
+test('şablon motoru afişten video ve shorts kapaklarını üretir', function () {
     $work = storage_path('framework/testing/trailer');
     $payload = new ThumbnailPayload(
         title: 'Çiçeğin İzi: Şafak Öncesi',
@@ -73,17 +73,40 @@ test('şablon motoru afişten 1280x720 kapak üretir', function () {
 
     $rendered = app(ThumbnailComposer::class)->renderAll($payload, $work.'/cikti');
 
-    // Backdrop olmasa da üç şablon da çalışmalı: zemine afişin bulanık hâli konur.
-    expect($rendered)->toHaveKeys(['poster_card', 'cinema', 'poster_focus'])
-        ->and($rendered)->toHaveCount(3);
+    // Backdrop olmasa da tüm şablonlar çalışmalı: zemine afişin bulanık hâli konur.
+    expect($rendered)->toHaveKeys(['poster_card', 'cinema', 'poster_focus', 'shorts_cinema', 'shorts_poster'])
+        ->and($rendered)->toHaveCount(5);
 
-    foreach ($rendered as $path) {
+    $formats = app(ThumbnailComposer::class)->formats();
+
+    foreach ($rendered as $key => $path) {
         [$width, $height] = getimagesize($path);
 
-        expect($width)->toBe(1280)
-            ->and($height)->toBe(720)
-            ->and(filesize($path))->toBeLessThan(2 * 1024 * 1024); // YouTube kapak sınırı
+        if ($formats[$key] === 'shorts') {
+            expect($width)->toBe(1080)->and($height)->toBe(1920);
+        } else {
+            expect($width)->toBe(1280)->and($height)->toBe(720);
+        }
+
+        expect(filesize($path))->toBeLessThan(2 * 1024 * 1024); // YouTube kapak sınırı
     }
+
+    File::deleteDirectory($work);
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
+test('biçim süzgeci yalnızca istenen kapakları üretir', function () {
+    $work = storage_path('framework/testing/trailer-bicim');
+    $payload = new ThumbnailPayload(
+        title: 'Gece Yarısı Ekspresi',
+        poster: sahteAfis($work.'/afis.jpg'),
+    );
+
+    $composer = app(ThumbnailComposer::class);
+
+    expect(array_keys($composer->renderAll($payload, $work.'/video', ['video'])))
+        ->toBe(['poster_card', 'cinema', 'poster_focus'])
+        ->and(array_keys($composer->renderAll($payload, $work.'/shorts', ['shorts'])))
+        ->toBe(['shorts_cinema', 'shorts_poster']);
 
     File::deleteDirectory($work);
 })->skip(! extension_loaded('gd'), 'GD eklentisi yok');
