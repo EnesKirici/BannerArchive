@@ -51,6 +51,7 @@ new #[Layout('admin.layout')] #[Title('Aktivite Logları')] class extends Compon
             'total_today' => ActivityLog::where('created_at', '>=', $today)->count(),
             'searches_today' => ActivityLog::where('action', 'search')->where('created_at', '>=', $today)->count(),
             'downloads_today' => ActivityLog::where('action', 'download')->where('created_at', '>=', $today)->count(),
+            'videos_today' => ActivityLog::where('action', 'video_download')->where('created_at', '>=', $today)->count(),
             'unique_ips_today' => ActivityLog::where('created_at', '>=', $today)->distinct('ip_address')->count('ip_address'),
         ];
     }
@@ -80,7 +81,7 @@ new #[Layout('admin.layout')] #[Title('Aktivite Logları')] class extends Compon
 
 <div>
     {{-- İstatistikler --}}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div class="bg-neutral-900 rounded-xl border border-white/5 p-4">
             <p class="text-2xl font-bold">{{ $this->stats['total_today'] }}</p>
             <p class="text-xs text-neutral-500">Bugün Toplam</p>
@@ -92,6 +93,10 @@ new #[Layout('admin.layout')] #[Title('Aktivite Logları')] class extends Compon
         <div class="bg-neutral-900 rounded-xl border border-white/5 p-4">
             <p class="text-2xl font-bold text-purple-400">{{ $this->stats['downloads_today'] }}</p>
             <p class="text-xs text-neutral-500">İndirme</p>
+        </div>
+        <div class="bg-neutral-900 rounded-xl border border-white/5 p-4">
+            <p class="text-2xl font-bold text-emerald-400">{{ $this->stats['videos_today'] }}</p>
+            <p class="text-xs text-neutral-500">Video İndirme</p>
         </div>
         <div class="bg-neutral-900 rounded-xl border border-white/5 p-4">
             <p class="text-2xl font-bold text-cyan-400">{{ $this->stats['unique_ips_today'] }}</p>
@@ -110,6 +115,7 @@ new #[Layout('admin.layout')] #[Title('Aktivite Logları')] class extends Compon
                 'search' => 'Arama',
                 'gallery' => 'Galeri',
                 'download' => 'İndirme',
+                'video_download' => 'Video',
                 'quote' => 'Quote',
             ] as $value => $label)
                 <button wire:click="$set('action', '{{ $value }}')"
@@ -160,12 +166,14 @@ new #[Layout('admin.layout')] #[Title('Aktivite Logları')] class extends Compon
                                 'search' => 'bg-fuchsia-500/10 text-fuchsia-400',
                                 'gallery' => 'bg-purple-500/10 text-purple-400',
                                 'download' => 'bg-cyan-500/10 text-cyan-400',
+                                'video_download' => 'bg-emerald-500/10 text-emerald-400',
                                 'quote' => 'bg-yellow-500/10 text-yellow-400',
                             ];
                             $actionLabels = [
                                 'search' => 'Arama',
                                 'gallery' => 'Galeri',
                                 'download' => 'İndirme',
+                                'video_download' => 'Video İndirme',
                                 'quote' => 'Quote',
                             ];
                         @endphp

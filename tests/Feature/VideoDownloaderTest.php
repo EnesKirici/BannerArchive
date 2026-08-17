@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\ActivityLog;
 use App\Models\SecurityLog;
 use App\Services\VideoDownloaderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -104,6 +105,12 @@ test('prepares download and exposes a token URL', function () {
 
     $downloadUrl = $component->get('downloadUrl');
     expect($downloadUrl)->toContain('/tools/video-downloader/file/');
+
+    $log = ActivityLog::query()->where('action', 'video_download')->first();
+    expect($log)->not->toBeNull()
+        ->and($log->description)->toBe('https://www.youtube.com/watch?v=abc123')
+        ->and($log->metadata['platform'])->toBe('youtube')
+        ->and($log->metadata['format'])->toBe('mp4_best');
 
     get($downloadUrl)
         ->assertSuccessful()

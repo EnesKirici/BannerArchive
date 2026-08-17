@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ActivityLog;
 use App\Models\BlockedIp;
 use App\Models\SecurityLog;
 use App\Services\VideoDownloaderService;
@@ -152,6 +153,12 @@ new #[Layout('layouts.tool')] #[Title('Video İndirici')] class extends Componen
                 'path' => $result['path'],
                 'name' => $downloadName,
             ], now()->addMinutes(30));
+
+            ActivityLog::log(request(), 'video_download', trim($this->url), [
+                'platform' => $validation['platform'],
+                'format' => $this->format,
+                'boyut' => round($result['size'] / 1048576, 1).' MB',
+            ]);
 
             $this->downloadUrl = route('tools.video-downloader.file', ['token' => $token]);
             $this->downloadName = $downloadName;
