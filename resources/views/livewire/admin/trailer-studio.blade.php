@@ -354,10 +354,14 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         ];
 
         $payload = $payload->with(
-            ribbon: $this->ribbonText(),
             brand: $this->brand,
             brandWhite: $this->brandStyle === 'beyaz',
         );
+
+        // Boş şerit metni "şerit olmasın" demektir; with() boş değeri yok
+        // saydığı için ayrı ele alınıyor.
+        $ribbon = $this->ribbonText();
+        $payload = $ribbon === '' ? $payload->withoutRibbon() : $payload->with(ribbon: $ribbon);
 
         $payload = match ($this->accentMode) {
             'oto' => $payload->withoutAccent(),
@@ -369,7 +373,9 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             $payload = $payload->withoutMeta();
         }
 
-        if ($this->logoChoice !== null) {
+        if ($this->logoMode === 'yok') {
+            $payload = $payload->withoutTitle();
+        } elseif ($this->logoChoice !== null) {
             $this->notice = 'Logo elle seçildi — otomatik kurallar uygulanmadı.';
         } elseif ($this->logoMode === 'text') {
             $payload = $payload->withoutLogo();
@@ -382,8 +388,14 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
 
         $directory = storage_path('app/private/trailer/thumbnails/'.auth()->id());
 
+        // Tur başında her şeyi silmek, üst üste binen isteklerde (ayar değişimi
+        // + arka plan ön-indirme) az önce üretilen dosyayı da götürüyor ve
+        // filesize 500 veriyordu. Yeni kapaklar zaten aynı adla üzerine
+        // yazılır; yalnızca eskimiş dosyaları temizlemek yeterli.
         foreach (glob($directory.'/*.jpg') ?: [] as $stale) {
-            @unlink($stale);
+            if ((@filemtime($stale) ?: 0) < now()->subMinutes(10)->getTimestamp()) {
+                @unlink($stale);
+            }
         }
 
         $formats = match ($this->format) {
@@ -413,19 +425,22 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     ? config('trailer.shorts.width').'×'.config('trailer.shorts.height')
                     : config('trailer.thumbnail.width').'×'.config('trailer.thumbnail.height'),
                 'file' => basename($path),
-                'size' => number_format(filesize($path) / 1024).' KB',
+                'size' => ($bytes = @filesize($path)) !== false ? number_format($bytes / 1024).' KB' : '—',
             ])
             ->values()
             ->all();
         $this->renderedAt = now()->timestamp;
     }
 
+    /** Boş dönüş "şerit basılmasın" demektir. */
     private function ribbonText(): string
     {
+        if ($this->ribbonKey === 'yok') {
+            return '';
+        }
+
         if ($this->ribbonKey === 'ozel') {
-            return trim($this->customRibbon) !== ''
-                ? trim($this->customRibbon)
-                : (string) config('trailer.defaults.ribbon');
+            return trim($this->customRibbon);
         }
 
         return (string) (config('trailer.ribbons')[$this->ribbonKey] ?? config('trailer.defaults.ribbon'));
@@ -571,6 +586,10 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                                 <span class="text-sm">{{ $text }}</span>
                             </label>
                         @endforeach
+                        <label class="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors {{ $ribbonKey === 'yok' ? 'border-fuchsia-500/60 bg-fuchsia-500/5' : 'border-white/5 hover:border-white/15' }}">
+                            <input type="radio" wire:model.live="ribbonKey" value="yok" class="accent-fuchsia-500">
+                            <span class="text-sm">Şerit olmasın <span class="text-neutral-600">(yazısız kapak)</span></span>
+                        </label>
                         <label class="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors {{ $ribbonKey === 'ozel' ? 'border-fuchsia-500/60 bg-fuchsia-500/5' : 'border-white/5 hover:border-white/15' }}">
                             <input type="radio" wire:model.live="ribbonKey" value="ozel" class="accent-fuchsia-500">
                             <span class="text-sm">Özel metin</span>
@@ -578,6 +597,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                         @if($ribbonKey === 'ozel')
                             <input wire:model.blur="customRibbon" type="text" placeholder="Örn. Türkçe Fragman"
                                    class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            <p class="text-[11px] text-neutral-600">Boş bırakılırsa şerit basılmaz.</p>
                         @endif
                     </div>
                 </div>
@@ -589,6 +609,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                             'auto' => 'Resmî logo (TMDB ne verirse)',
                             'tr' => 'Sadece Türkçe logo — yoksa yazı',
                             'text' => 'Her zaman yazı olarak',
+                            'yok' => 'Hiç basılmasın — afişteki yeterli',
                         ] as $key => $text)
                             <label class="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors {{ $logoMode === $key ? 'border-fuchsia-500/60 bg-fuchsia-500/5' : 'border-white/5 hover:border-white/15' }}">
                                 <input type="radio" wire:model.live="logoMode" value="{{ $key }}" class="accent-fuchsia-500">
