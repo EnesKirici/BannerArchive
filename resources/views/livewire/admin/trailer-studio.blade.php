@@ -31,6 +31,13 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
 
     public string $selectedTitle = '';
 
+    /**
+     * Kapak biçimi: video (16:9) · shorts (9:16 dikey) · both (ikisi de).
+     * null = içerik seçildi ama biçim henüz sorulmadı; kapak üretilmez.
+     * Her içerik seçiminde sıfırlanır — kullanıcıya her seferinde sorulur.
+     */
+    public ?string $format = null;
+
     /*
     | Aşağıdaki tercihler #[Session] ile saklanıyor: bir kez seçilen ayar
     | sonraki filmlerde ve sonraki girişlerde aynı kalsın diye. Filme özgü
@@ -158,12 +165,59 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->selectedTitle = (string) $chosen['title'];
         $this->backdropChoice = null;
         $this->logoChoice = null;
+        $this->format = null;
+        $this->thumbnails = [];
+        $this->artwork = [];
+        $this->notice = null;
+        $this->error = null;
 
         $artwork = app(ArtworkFetcher::class);
         $this->backdropOptions = $artwork->backdrops($this->selectedType, $id);
         $this->logoOptions = $artwork->logos($this->selectedType, $id);
 
-        $this->build($artwork, app(ThumbnailComposer::class));
+        // Kapak hemen üretilmez: önce biçim (video/shorts) sorulur. Kullanıcı
+        // seçim yaparken görseller ayrı bir istekte arka planda indirilir;
+        // biçime basıldığında her şey diskte hazır olur, üretim hızlı biter.
+        $this->js('$wire.prefetchArtwork()');
+
+        $this->js('setTimeout(() => document.getElementById("kapak-turu")?.scrollIntoView({ behavior: "smooth", block: "center" }), 80)');
+    }
+
+    /**
+     * Kullanıcı biçim seçerken TMDB görsellerini diske indir (arka plan isteği).
+     *
+     * Yalnızca indirme yapar, kapak üretmez; aynı görseller build() sırasında
+     * tekrar istendiğinde diskten okunur ve ağa hiç çıkılmaz.
+     */
+    public function prefetchArtwork(ArtworkFetcher $artwork): void
+    {
+        if ($this->selectedId === null) {
+            return;
+        }
+
+        $payload = $artwork->fetch($this->selectedType, $this->selectedId);
+
+        if ($payload === null) {
+            return;
+        }
+
+        // Rozet satırı erkenden dolsun: hangi görseller var, seçim ekranında görünür.
+        $this->artwork = [
+            'afiş' => $payload->poster !== null,
+            'backdrop' => $payload->backdrop !== null,
+            'logo' => $payload->logo !== null,
+        ];
+    }
+
+    public function chooseFormat(string $format): void
+    {
+        if (! in_array($format, ['video', 'shorts', 'both'], true)) {
+            return;
+        }
+
+        $this->format = $format;
+
+        $this->build(app(ArtworkFetcher::class), app(ThumbnailComposer::class));
 
         // Kapaklar sayfanın altında üretiliyor; kullanıcıyı oraya götür.
         // Kısa gecikme, hedef bölümün DOM'a yerleşmesini bekliyor.
@@ -187,7 +241,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
     /** Ayarlardan biri değişince kapakları tazele. */
     public function updated(string $property, mixed $value = null): void
     {
-        if ($this->selectedId === null || $property === 'query') {
+        if ($this->selectedId === null || $this->format === null || $property === 'query') {
             return;
         }
 
@@ -200,7 +254,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->notice = null;
         $this->thumbnails = [];
 
-        if ($this->selectedId === null) {
+        if ($this->selectedId === null || $this->format === null) {
             return;
         }
 
@@ -271,9 +325,14 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             @unlink($stale);
         }
 
+        $formats = match ($this->format) {
+            'both' => ['video', 'shorts'],
+            default => [$this->format],
+        };
+
         try {
-            // renderAll: vurgu rengini üç şablon için bir kez hesaplar.
-            $rendered = $composer->renderAll($payload, $directory);
+            // renderAll: vurgu rengini tüm şablonlar için bir kez hesaplar.
+            $rendered = $composer->renderAll($payload, $directory, $formats);
         } catch (\Throwable $exception) {
             report($exception);
             $this->error = 'Kapak üretilemedi: '.$exception->getMessage();
@@ -282,11 +341,16 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         }
 
         $labels = $composer->options();
+        $templateFormats = $composer->formats();
 
         $this->thumbnails = collect($rendered)
             ->map(fn (string $path, string $key): array => [
                 'key' => $key,
                 'label' => $labels[$key] ?? $key,
+                'format' => $templateFormats[$key] ?? 'video',
+                'boyut' => ($templateFormats[$key] ?? 'video') === 'shorts'
+                    ? config('trailer.shorts.width').'×'.config('trailer.shorts.height')
+                    : config('trailer.thumbnail.width').'×'.config('trailer.thumbnail.height'),
                 'file' => basename($path),
                 'size' => number_format(filesize($path) / 1024).' KB',
             ])
@@ -355,7 +419,73 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         @endif
     </div>
 
+    {{-- ------------------------------------------- Kapak türü (video / shorts) --}}
     @if($selectedId)
+        <div id="kapak-turu" class="bg-neutral-900 rounded-xl border border-white/5 p-6 scroll-mt-24">
+            <div class="flex items-start justify-between flex-wrap gap-3">
+                <div>
+                    <h3 class="font-semibold">
+                        {{ $selectedTitle }}
+                        <span class="text-neutral-500 font-normal">— hangi kapak üretilsin?</span>
+                    </h3>
+                    <p class="mt-1 text-xs text-neutral-500">
+                        <span wire:loading wire:target="prefetchArtwork" class="inline-flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            Siz seçerken görseller arka planda indiriliyor…
+                        </span>
+                        <span wire:loading.remove wire:target="prefetchArtwork">
+                            {{ $artwork !== [] ? 'Görseller hazır — türü seçince kapaklar üretilir.' : 'Kapak türünü seçin.' }}
+                        </span>
+                    </p>
+                </div>
+                @if($artwork)
+                    <div class="flex flex-wrap gap-2">
+                        @foreach($artwork as $name => $found)
+                            <span class="px-2 py-0.5 text-[11px] rounded {{ $found ? 'bg-emerald-500/10 text-emerald-400' : 'bg-neutral-800 text-neutral-500' }}">
+                                {{ $name }} {{ $found ? '✓' : '✗' }}
+                            </span>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                @foreach([
+                    'video' => ['Video Kapağı', '16:9 · '.config('trailer.thumbnail.width').'×'.config('trailer.thumbnail.height'), 'M3 6.75A2.25 2.25 0 015.25 4.5h13.5A2.25 2.25 0 0121 6.75v10.5a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 17.25V6.75z'],
+                    'shorts' => ['Shorts Kapağı', '9:16 dikey · '.config('trailer.shorts.width').'×'.config('trailer.shorts.height'), 'M8.25 3h7.5A2.25 2.25 0 0118 5.25v13.5A2.25 2.25 0 0115.75 21h-7.5A2.25 2.25 0 016 18.75V5.25A2.25 2.25 0 018.25 3z'],
+                    'both' => ['İkisi de', 'Video + Shorts birlikte üretilir', 'M3 8.25A2.25 2.25 0 015.25 6h8.5A2.25 2.25 0 0116 8.25v7.5A2.25 2.25 0 0113.75 18h-8.5A2.25 2.25 0 013 15.75v-7.5zM18.5 6.5h.25A2.25 2.25 0 0121 8.75v6.5a2.25 2.25 0 01-2.25 2.25h-.25'],
+                ] as $key => [$baslik, $aciklama, $ikon])
+                    <button type="button" wire:click="chooseFormat('{{ $key }}')"
+                            wire:loading.attr="disabled" wire:target="chooseFormat"
+                            class="group text-left px-4 py-4 rounded-xl border transition-colors disabled:opacity-60 {{ $format === $key ? 'border-fuchsia-500 bg-fuchsia-500/10' : 'border-white/10 hover:border-fuchsia-500/50 hover:bg-white/5' }}">
+                        <span class="flex items-center gap-3">
+                            <svg class="w-7 h-7 shrink-0 {{ $format === $key ? 'text-fuchsia-400' : 'text-neutral-400 group-hover:text-fuchsia-400' }} transition-colors"
+                                 fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="{{ $ikon }}"/>
+                            </svg>
+                            <span>
+                                <span class="block font-semibold text-sm">{{ $baslik }}</span>
+                                <span class="block text-[11px] text-neutral-500">{{ $aciklama }}</span>
+                            </span>
+                        </span>
+                    </button>
+                @endforeach
+            </div>
+
+            <div wire:loading.flex wire:target="chooseFormat" class="mt-3 items-center gap-2 text-sm text-neutral-300">
+                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Kapaklar üretiliyor…
+            </div>
+        </div>
+    @endif
+
+    @if($selectedId && $format)
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
             {{-- ------------------------------------------------------- Ayarlar --}}
@@ -536,7 +666,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             {{-- ---------------------------------------------------- Önizlemeler --}}
             <div id="kapaklar" class="xl:col-span-2 space-y-6 relative scroll-mt-24">
 
-                <div wire:loading.flex wire:target="choose,build,chooseBackdrop,chooseLogo,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon"
+                <div wire:loading.flex wire:target="chooseFormat,build,chooseBackdrop,chooseLogo,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon"
                      class="absolute inset-0 z-10 bg-neutral-950/70 backdrop-blur-sm rounded-xl items-center justify-center">
                     <div class="flex items-center gap-3 text-sm text-neutral-300">
                         <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -548,11 +678,16 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                 </div>
 
                 @forelse($thumbnails as $thumb)
-                    <div class="bg-neutral-900 rounded-xl border border-white/5 overflow-hidden">
+                    <div class="bg-neutral-900 rounded-xl border border-white/5 overflow-hidden" wire:key="kapak-{{ $thumb['key'] }}">
                         <div class="px-5 py-3 flex items-center justify-between border-b border-white/5">
                             <div>
-                                <p class="font-semibold text-sm">{{ $thumb['label'] }}</p>
-                                <p class="text-xs text-neutral-500 font-mono">{{ $thumb['key'] }} · 1280×720 · {{ $thumb['size'] }}</p>
+                                <p class="font-semibold text-sm flex items-center gap-2">
+                                    {{ $thumb['label'] }}
+                                    <span class="px-1.5 py-0.5 text-[10px] rounded uppercase tracking-wide {{ $thumb['format'] === 'shorts' ? 'bg-rose-500/10 text-rose-400' : 'bg-sky-500/10 text-sky-400' }}">
+                                        {{ $thumb['format'] === 'shorts' ? 'Shorts' : 'Video' }}
+                                    </span>
+                                </p>
+                                <p class="text-xs text-neutral-500 font-mono">{{ $thumb['key'] }} · {{ $thumb['boyut'] }} · {{ $thumb['size'] }}</p>
                             </div>
                             <a href="{{ route('admin.trailers.preview', ['file' => $thumb['file'], 'indir' => 1]) }}"
                                class="px-4 py-2 text-sm rounded-lg bg-white/5 hover:bg-white/10 transition-colors flex items-center gap-2">
@@ -562,8 +697,16 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                                 İndir
                             </a>
                         </div>
-                        <img src="{{ route('admin.trailers.preview', ['file' => $thumb['file'], 'v' => $renderedAt]) }}"
-                             alt="{{ $thumb['label'] }}" class="w-full block">
+                        @if($thumb['format'] === 'shorts')
+                            {{-- Dikey kapak telefonda görüneceği gibi: dar, çerçeveli önizleme --}}
+                            <div class="p-6 flex justify-center bg-neutral-950/50">
+                                <img src="{{ route('admin.trailers.preview', ['file' => $thumb['file'], 'v' => $renderedAt]) }}"
+                                     alt="{{ $thumb['label'] }}" class="w-full max-w-[300px] rounded-2xl border border-white/10 shadow-2xl">
+                            </div>
+                        @else
+                            <img src="{{ route('admin.trailers.preview', ['file' => $thumb['file'], 'v' => $renderedAt]) }}"
+                                 alt="{{ $thumb['label'] }}" class="w-full block">
+                        @endif
                     </div>
                 @empty
                     <div class="bg-neutral-900 rounded-xl border border-white/5 p-10 text-center text-neutral-500">
