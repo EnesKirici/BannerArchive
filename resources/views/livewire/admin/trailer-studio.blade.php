@@ -83,6 +83,15 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
     /** @var array<int, array{path: string, dil: string|null}> */
     public array $logoOptions = [];
 
+    /** Elle seçilen afiş (TMDB dosya yolu); null = en iyisi otomatik. Shorts kapağının zeminidir. */
+    public ?string $posterChoice = null;
+
+    /** @var array<int, array{path: string, dil: string|null}> */
+    public array $posterOptions = [];
+
+    /** "İkisi de" üretildiğinde önizlemede aktif sekme; soldaki ayarlar da buna göre değişir. */
+    public string $previewTab = 'video';
+
     public function mount(): void
     {
         // Oturumdan gelen bir tercih varsa ona dokunma; yoksa yapılandırmadan doldur.
@@ -165,6 +174,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->selectedTitle = (string) $chosen['title'];
         $this->backdropChoice = null;
         $this->logoChoice = null;
+        $this->posterChoice = null;
         $this->format = null;
         $this->thumbnails = [];
         $this->artwork = [];
@@ -174,6 +184,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $artwork = app(ArtworkFetcher::class);
         $this->backdropOptions = $artwork->backdrops($this->selectedType, $id);
         $this->logoOptions = $artwork->logos($this->selectedType, $id);
+        $this->posterOptions = $artwork->posters($this->selectedType, $id);
 
         // Kapak hemen üretilmez: önce biçim (video/shorts) sorulur. Kullanıcı
         // seçim yaparken görseller ayrı bir istekte arka planda indirilir;
@@ -216,6 +227,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         }
 
         $this->format = $format;
+        $this->previewTab = $format === 'shorts' ? 'shorts' : 'video';
 
         $this->build(app(ArtworkFetcher::class), app(ThumbnailComposer::class));
 
@@ -236,6 +248,47 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->logoChoice = $path;
 
         $this->build(app(ArtworkFetcher::class), app(ThumbnailComposer::class));
+    }
+
+    public function choosePoster(?string $path): void
+    {
+        $this->posterChoice = $path;
+
+        $this->build(app(ArtworkFetcher::class), app(ThumbnailComposer::class));
+    }
+
+    /** Sekme değişimi yalnızca görünümü süzer; kapaklar yeniden üretilmez. */
+    public function setPreviewTab(string $tab): void
+    {
+        if (in_array($tab, ['video', 'shorts'], true)) {
+            $this->previewTab = $tab;
+        }
+    }
+
+    /**
+     * Soldaki ayarların hangi biçime göre gösterileceği.
+     * Tek biçim seçiliyse o; "İkisi de" seçiliyse aktif sekme belirler.
+     */
+    public function activeContext(): string
+    {
+        return $this->format === 'both' ? $this->previewTab : ($this->format ?? 'video');
+    }
+
+    /**
+     * Önizlemede gösterilecek kapaklar: "İkisi de"de aktif sekmeye göre süzülür.
+     *
+     * @return array<int, array<string, string>>
+     */
+    public function visibleThumbnails(): array
+    {
+        if ($this->format !== 'both') {
+            return $this->thumbnails;
+        }
+
+        return array_values(array_filter(
+            $this->thumbnails,
+            fn (array $thumb): bool => ($thumb['format'] ?? 'video') === $this->previewTab,
+        ));
     }
 
     /** Ayarlardan biri değişince kapakları tazele. */
@@ -270,6 +323,14 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         if ($this->backdropChoice !== null) {
             $payload = $payload->withBackdrop(
                 $artwork->download($this->backdropChoice, (string) config('trailer.sizes.backdrop'))
+            );
+        }
+
+        // Afiş de elle seçilebiliyor; Shorts kapaklarının zemini ve karttaki
+        // afiş bu seçime göre değişir (video şablonlarındaki afiş kartı da).
+        if ($this->posterChoice !== null) {
+            $payload = $payload->withPoster(
+                $artwork->download($this->posterChoice, (string) config('trailer.sizes.poster'))
             );
         }
 
@@ -583,7 +644,9 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     <span class="text-sm">Yıl • tür satırını göster</span>
                 </label>
 
-                @if($backdropOptions)
+                {{-- Görsel seçiciler aktif biçime göre değişir: video kapağının
+                     zemini backdrop, shorts kapağının zemini afiştir. --}}
+                @if($this->activeContext() === 'video' && $backdropOptions)
                     <div>
                         <label class="block text-sm font-medium mb-2">
                             Arka plan görseli
@@ -605,6 +668,31 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                             @endforeach
                         </div>
                         <p class="mt-1.5 text-[11px] text-neutral-600">Dil rozetli olanların üzerinde yazı vardır, logoyla çakışabilir.</p>
+                    </div>
+                @endif
+
+                @if($this->activeContext() === 'shorts' && $posterOptions)
+                    <div>
+                        <label class="block text-sm font-medium mb-2">
+                            Afiş görseli
+                            <span class="text-neutral-600 font-normal">({{ count($posterOptions) }} görsel)</span>
+                        </label>
+                        <div class="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto pr-1">
+                            <button type="button" wire:click="choosePoster(null)"
+                                    class="aspect-[2/3] rounded-md border text-[11px] text-neutral-400 flex items-center justify-center transition-colors {{ $posterChoice === null ? 'border-fuchsia-500 text-white' : 'border-white/10 hover:border-white/30' }}">
+                                Otomatik
+                            </button>
+                            @foreach($posterOptions as $option)
+                                <button type="button" wire:click="choosePoster('{{ $option['path'] }}')" wire:key="afis-{{ $loop->index }}"
+                                        class="relative aspect-[2/3] rounded-md overflow-hidden border transition-colors {{ $posterChoice === $option['path'] ? 'border-fuchsia-500' : 'border-white/10 hover:border-white/30' }}">
+                                    <img src="https://image.tmdb.org/t/p/w185{{ $option['path'] }}" alt="" class="w-full h-full object-cover">
+                                    @if($option['dil'])
+                                        <span class="absolute top-1 right-1 px-1 rounded bg-black/70 text-[9px] uppercase">{{ $option['dil'] }}</span>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                        <p class="mt-1.5 text-[11px] text-neutral-600">Shorts kapağının zemini ve karttaki afiş buradan değişir.</p>
                     </div>
                 @endif
 
@@ -666,7 +754,20 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             {{-- ---------------------------------------------------- Önizlemeler --}}
             <div id="kapaklar" class="xl:col-span-2 space-y-6 relative scroll-mt-24">
 
-                <div wire:loading.flex wire:target="chooseFormat,build,chooseBackdrop,chooseLogo,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon"
+                @if($format === 'both')
+                    {{-- İkisi de üretildi: önizleme sekmeli; soldaki ayarlar da sekmeye uyar. --}}
+                    <div class="flex gap-2 bg-neutral-900 rounded-xl border border-white/5 p-2">
+                        @foreach(['video' => 'Video (16:9)', 'shorts' => 'Shorts (9:16)'] as $tab => $tabLabel)
+                            <button type="button" wire:click="setPreviewTab('{{ $tab }}')"
+                                    class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors {{ $previewTab === $tab ? 'bg-fuchsia-600 text-white' : 'text-neutral-400 hover:bg-white/5 hover:text-white' }}">
+                                {{ $tabLabel }}
+                                <span class="ml-1 text-xs font-normal opacity-70">({{ collect($thumbnails)->where('format', $tab)->count() }})</span>
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+
+                <div wire:loading.flex wire:target="chooseFormat,build,chooseBackdrop,chooseLogo,choosePoster,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon"
                      class="absolute inset-0 z-10 bg-neutral-950/70 backdrop-blur-sm rounded-xl items-center justify-center">
                     <div class="flex items-center gap-3 text-sm text-neutral-300">
                         <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -677,7 +778,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     </div>
                 </div>
 
-                @forelse($thumbnails as $thumb)
+                @forelse($this->visibleThumbnails() as $thumb)
                     <div class="bg-neutral-900 rounded-xl border border-white/5 overflow-hidden" wire:key="kapak-{{ $thumb['key'] }}">
                         <div class="px-5 py-3 flex items-center justify-between border-b border-white/5">
                             <div>
