@@ -56,9 +56,11 @@ final class ShortsPosterTemplate extends AbstractTemplate
 
         $titleHeight = $this->titleBlock($canvas, $payload, $centerX, 1560, $width - 180, 280, 'center');
 
-        $metaBaseline = 1560 - $titleHeight - 40;
-        $this->metaLine($canvas, $payload->meta, $centerX, $metaBaseline, 'center');
-        $this->accentBar($canvas, $centerX, $metaBaseline - 54, $accent, 96, 'center');
+        if ($payload->meta !== null) {
+            $metaBaseline = 1560 - $titleHeight - 40;
+            $this->metaLine($canvas, $payload->meta, $centerX, $metaBaseline, 'center');
+            $this->accentBar($canvas, $centerX, $metaBaseline - 54, $accent, 96, 'center');
+        }
 
         $this->ribbon($canvas, $payload->ribbon, $centerX, 1600, $accent, 'center', 1.3);
         $this->brandMark($canvas, $payload);

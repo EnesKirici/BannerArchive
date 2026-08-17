@@ -44,9 +44,12 @@ final class CinemaTemplate extends AbstractTemplate
 
         $titleHeight = $this->titleBlock($canvas, $payload, $centerX, 452, 960, 210, 'center');
 
-        $metaBaseline = 452 - $titleHeight - 36;
-        $this->metaLine($canvas, $payload->meta, $centerX, $metaBaseline, 'center');
-        $this->accentBar($canvas, $centerX, $metaBaseline - 50, $accent, 96, 'center');
+        // Meta gizliyken vurgu çizgisi ortada tek başına asılı kalıyor; ikisi birlikte.
+        if ($payload->meta !== null) {
+            $metaBaseline = 452 - $titleHeight - 36;
+            $this->metaLine($canvas, $payload->meta, $centerX, $metaBaseline, 'center');
+            $this->accentBar($canvas, $centerX, $metaBaseline - 50, $accent, 96, 'center');
+        }
 
         $this->ribbon($canvas, $payload->ribbon, $centerX, 484, $accent, 'center');
         $this->brandMark($canvas, $payload);

@@ -102,6 +102,23 @@ test('elle seçilen afiş payload üzerinde değişir', function () {
         ->and($payload->poster)->toBe('a.jpg');
 });
 
+test('şerit ve film adı istenirse hiç basılmaz', function () {
+    $work = storage_path('framework/testing/trailer-sade');
+    $payload = (new ThumbnailPayload(
+        title: 'Sade Kapak',
+        poster: sahteAfis($work.'/afis.jpg'),
+    ))->withoutRibbon()->withoutTitle()->withoutMeta();
+
+    expect($payload->ribbon)->toBe('')
+        ->and($payload->titleHidden)->toBeTrue();
+
+    $rendered = app(ThumbnailComposer::class)->renderAll($payload, $work.'/cikti');
+
+    expect($rendered)->toHaveCount(5);
+
+    File::deleteDirectory($work);
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
 test('biçim süzgeci yalnızca istenen kapakları üretir', function () {
     $work = storage_path('framework/testing/trailer-bicim');
     $payload = new ThumbnailPayload(

@@ -113,6 +113,10 @@ abstract class AbstractTemplate implements ThumbnailTemplate
         int $maxHeight,
         string $align = 'left',
     ): int {
+        if ($payload->titleHidden) {
+            return 0;
+        }
+
         // Logo bozuk ya da desteklenmeyen bir formatsa sessizce başlık metnine düşülür.
         if ($payload->logo !== null) {
             try {
@@ -174,6 +178,11 @@ abstract class AbstractTemplate implements ThumbnailTemplate
         string $align = 'left',
         float $scale = 1.0,
     ): array {
+        // Şerit istenmemiş: hiç çizme, yerleşim hesabına da girmesin.
+        if (trim($text) === '') {
+            return ['width' => 0, 'height' => 0];
+        }
+
         $height = (int) round(62 * $scale);
         $paddingX = (int) round(28 * $scale);
 

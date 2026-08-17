@@ -51,9 +51,11 @@ final class PosterCardTemplate extends AbstractTemplate
         // kalır, meta ve vurgu çizgisi başlığın gerçek yüksekliğine göre yukarı kayar.
         $titleHeight = $this->titleBlock($canvas, $payload, $columnX, 435, $columnWidth, 210);
 
-        $metaBaseline = 435 - $titleHeight - 34;
-        $this->metaLine($canvas, $payload->meta, $columnX, $metaBaseline);
-        $this->accentBar($canvas, $columnX, $metaBaseline - 48, $accent);
+        if ($payload->meta !== null) {
+            $metaBaseline = 435 - $titleHeight - 34;
+            $this->metaLine($canvas, $payload->meta, $columnX, $metaBaseline);
+            $this->accentBar($canvas, $columnX, $metaBaseline - 48, $accent);
+        }
 
         $this->ribbon($canvas, $payload->ribbon, $columnX, 463, $accent);
         $this->brandMark($canvas, $payload);

@@ -25,6 +25,8 @@ final readonly class ThumbnailPayload
         public bool $brandWhite = false,
         /** Kullanılan logonun dili ('tr', 'en'…). Panelde uyarı göstermek için. */
         public ?string $logoLanguage = null,
+        /** Film adı (logo/yazı) hiç basılmasın — afişte zaten yazıyorsa. */
+        public bool $titleHidden = false,
     ) {}
 
     /** Boş ya da null değerler yok sayılarak üzerine yazılmış bir kopya üret. */
@@ -50,6 +52,18 @@ final readonly class ThumbnailPayload
     public function withoutLogo(): self
     {
         return $this->copy(dropLogo: true);
+    }
+
+    /** Film adını hiç basma — afişin üzerindeki yeterliyse. */
+    public function withoutTitle(): self
+    {
+        return $this->copy(dropLogo: true, hideTitle: true);
+    }
+
+    /** Şeridi kaldır: kapakta fragman yazısı olmasın. */
+    public function withoutRibbon(): self
+    {
+        return $this->copy(dropRibbon: true);
     }
 
     /** Yıl • tür satırını gizle. */
@@ -103,18 +117,21 @@ final readonly class ThumbnailPayload
         bool $dropLogo = false,
         bool $dropMeta = false,
         bool $dropAccent = false,
+        bool $dropRibbon = false,
+        bool $hideTitle = false,
     ): self {
         return new self(
             title: $title ?? $this->title,
             poster: $setPoster ? $poster : $this->poster,
             backdrop: $setBackdrop ? $backdrop : $this->backdrop,
             logo: $dropLogo ? null : ($setLogo ? $logo : $this->logo),
-            ribbon: $ribbon ?? $this->ribbon,
+            ribbon: $dropRibbon ? '' : ($ribbon ?? $this->ribbon),
             meta: $dropMeta ? null : ($meta ?? $this->meta),
             accent: $dropAccent ? null : ($accent ?? $this->accent),
             brand: $brand ?? $this->brand,
             brandWhite: $brandWhite ?? $this->brandWhite,
             logoLanguage: $this->logoLanguage,
+            titleHidden: $hideTitle || $this->titleHidden,
         );
     }
 

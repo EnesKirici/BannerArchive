@@ -57,9 +57,11 @@ final class ShortsCinemaTemplate extends AbstractTemplate
 
         $titleHeight = $this->titleBlock($canvas, $payload, $centerX, 1568, $width - 160, 320, 'center');
 
-        $metaBaseline = 1568 - $titleHeight - 42;
-        $this->metaLine($canvas, $payload->meta, $centerX, $metaBaseline, 'center');
-        $this->accentBar($canvas, $centerX, $metaBaseline - 56, $accent, 96, 'center');
+        if ($payload->meta !== null) {
+            $metaBaseline = 1568 - $titleHeight - 42;
+            $this->metaLine($canvas, $payload->meta, $centerX, $metaBaseline, 'center');
+            $this->accentBar($canvas, $centerX, $metaBaseline - 56, $accent, 96, 'center');
+        }
 
         $this->ribbon($canvas, $payload->ribbon, $centerX, 1608, $accent, 'center', 1.3);
         $this->brandMark($canvas, $payload);

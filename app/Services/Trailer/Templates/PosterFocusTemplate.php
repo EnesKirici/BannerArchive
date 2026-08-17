@@ -53,9 +53,11 @@ final class PosterFocusTemplate extends AbstractTemplate
 
         $titleHeight = $this->titleBlock($canvas, $payload, $columnX, 440, $columnWidth, 200);
 
-        $metaBaseline = 440 - $titleHeight - 34;
-        $this->metaLine($canvas, $payload->meta, $columnX, $metaBaseline);
-        $this->accentBar($canvas, $columnX, $metaBaseline - 48, $accent);
+        if ($payload->meta !== null) {
+            $metaBaseline = 440 - $titleHeight - 34;
+            $this->metaLine($canvas, $payload->meta, $columnX, $metaBaseline);
+            $this->accentBar($canvas, $columnX, $metaBaseline - 48, $accent);
+        }
 
         $this->ribbon($canvas, $payload->ribbon, $columnX, 468, $accent);
         // Afiş sağda durduğu için logo sol alta gider.
