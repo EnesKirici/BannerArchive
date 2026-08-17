@@ -69,6 +69,24 @@ final class ArtworkFetcher
     }
 
     /**
+     * Panelde elle seçilebilsin diye tüm afişler (dikey görseller).
+     *
+     * Shorts kapaklarının zemini ve karttaki afiş buradan değiştirilir.
+     * Sıra: Türkçe (yerel başlık basılı), İngilizce, yazısız, diğerleri.
+     *
+     * @return array<int, array{path: string, dil: string|null}>
+     */
+    public function posters(string $type, int $id, int $limit = 60): array
+    {
+        return $this->pickable($this->allImages($type, $id)['posters'] ?? [], $limit, fn (?string $language): int => match ($language) {
+            'tr' => 0,
+            'en' => 1,
+            null => 2,
+            default => 3,
+        });
+    }
+
+    /**
      * Elle seçilebilsin diye tüm film adı logoları (title treatment).
      *
      * Sıra: Türkçe, İngilizce, sonra diğerleri.

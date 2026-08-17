@@ -94,6 +94,14 @@ test('şablon motoru afişten video ve shorts kapaklarını üretir', function (
     File::deleteDirectory($work);
 })->skip(! extension_loaded('gd'), 'GD eklentisi yok');
 
+test('elle seçilen afiş payload üzerinde değişir', function () {
+    $payload = new ThumbnailPayload(title: 'Deneme', poster: 'a.jpg');
+
+    expect($payload->withPoster('b.jpg')->poster)->toBe('b.jpg')
+        ->and($payload->withPoster(null)->poster)->toBeNull()
+        ->and($payload->poster)->toBe('a.jpg');
+});
+
 test('biçim süzgeci yalnızca istenen kapakları üretir', function () {
     $work = storage_path('framework/testing/trailer-bicim');
     $payload = new ThumbnailPayload(

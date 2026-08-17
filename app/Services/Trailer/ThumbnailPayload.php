@@ -64,6 +64,12 @@ final readonly class ThumbnailPayload
         return $this->copy(backdrop: $file, setBackdrop: true);
     }
 
+    /** Afişi elle seçilen görselle değiştir (null = afiş yok). */
+    public function withPoster(?string $file): self
+    {
+        return $this->copy(poster: $file, setPoster: true);
+    }
+
     /** Film adı logosunu elle seçilenle değiştir. */
     public function withLogo(?string $file): self
     {
@@ -90,6 +96,8 @@ final readonly class ThumbnailPayload
         ?bool $brandWhite = null,
         ?string $backdrop = null,
         bool $setBackdrop = false,
+        ?string $poster = null,
+        bool $setPoster = false,
         ?string $logo = null,
         bool $setLogo = false,
         bool $dropLogo = false,
@@ -98,7 +106,7 @@ final readonly class ThumbnailPayload
     ): self {
         return new self(
             title: $title ?? $this->title,
-            poster: $this->poster,
+            poster: $setPoster ? $poster : $this->poster,
             backdrop: $setBackdrop ? $backdrop : $this->backdrop,
             logo: $dropLogo ? null : ($setLogo ? $logo : $this->logo),
             ribbon: $ribbon ?? $this->ribbon,
