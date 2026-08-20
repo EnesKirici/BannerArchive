@@ -181,7 +181,7 @@ class AvifCodec
     {
         foreach ([$this->decoderPath(), $this->encoderPath()] as $binary) {
             try {
-                if (! Process::timeout(10)->run([$binary, '--version'])->successful()) {
+                if (! Process::path(sys_get_temp_dir())->timeout(10)->run([$binary, '--version'])->successful()) {
                     return false;
                 }
             } catch (\Throwable) {
@@ -197,7 +197,9 @@ class AvifCodec
      */
     private function run(array $command): void
     {
-        $result = Process::timeout((int) config('image.avif.timeout', 30))->run($command);
+        $result = Process::path(sys_get_temp_dir())
+            ->timeout((int) config('image.avif.timeout', 30))
+            ->run($command);
 
         if ($result->successful()) {
             return;
@@ -214,12 +216,35 @@ class AvifCodec
 
     private function decoderPath(): string
     {
-        return (string) config('image.avif.decoder', 'avifdec');
+        return $this->resolveBinary((string) config('image.avif.decoder', 'avifdec'));
     }
 
     private function encoderPath(): string
     {
-        return (string) config('image.avif.encoder', 'avifenc');
+        return $this->resolveBinary((string) config('image.avif.encoder', 'avifenc'));
+    }
+
+    /**
+     * Araç adını çalıştırılabilir bir yola çevirir.
+     *
+     * PHP-FPM havuzunda env[PATH] genelde kapalıdır; çıplak "avifdec" o zaman
+     * çözülemez. Yapılandırmada mutlak yol verilmişse ona dokunulmaz.
+     */
+    private function resolveBinary(string $binary): string
+    {
+        if (str_contains($binary, '/')) {
+            return $binary;
+        }
+
+        foreach (['/usr/bin', '/usr/local/bin', '/bin', '/opt/homebrew/bin'] as $directory) {
+            $candidate = $directory.'/'.$binary;
+
+            if (is_file($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return $binary;
     }
 
     private function hasContent(string $path): bool
