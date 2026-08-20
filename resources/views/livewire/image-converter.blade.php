@@ -6,6 +6,7 @@ use App\Services\ImageConverterService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -110,8 +111,26 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
         $this->photos = [];
     }
 
+    /**
+     * Sunucunun gerçekten üretebildiği hedef formatlar.
+     *
+     * @return array<int, string>
+     */
+    #[Computed]
+    public function targetFormats(): array
+    {
+        return app(ImageConverterService::class)->availableTargetFormats();
+    }
+
     public function convertWithOptions(string $format, int $quality): void
     {
+        if (! in_array($format, $this->targetFormats, true)) {
+            $this->message = 'Bu format şu anda kullanılamıyor.';
+            $this->messageType = 'error';
+
+            return;
+        }
+
         $this->targetFormat = $format;
         $this->quality = max(1, min(100, $quality));
         $this->convert();
@@ -618,7 +637,7 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
                 <div class="flex items-center gap-2">
                     <span class="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Format</span>
                     <div class="flex gap-1">
-                        @foreach(['png', 'webp', 'avif', 'jpg'] as $fmt)
+                        @foreach($this->targetFormats as $fmt)
                             <button
                                 @click="fmt = '{{ $fmt }}'"
                                 :class="fmt === '{{ $fmt }}'

@@ -2,11 +2,32 @@
 
 namespace App\Services;
 
+use App\Services\Image\AvifCodec;
 use ZipArchive;
 
 class ImageConverterService
 {
     private const MAX_PIXELS = 25_000_000;
+
+    public function __construct(private readonly AvifCodec $avif) {}
+
+    /**
+     * Bu sunucuda gerçekten üretilebilen hedef formatlar.
+     *
+     * @return array<int, string>
+     */
+    public function availableTargetFormats(): array
+    {
+        $formats = ['png', 'webp'];
+
+        if ($this->avif->canEncode()) {
+            $formats[] = 'avif';
+        }
+
+        $formats[] = 'jpg';
+
+        return $formats;
+    }
 
     /**
      * Dosyanın gerçek bir resim olduğunu derinlemesine doğrula.
@@ -122,14 +143,15 @@ class ImageConverterService
         }
 
         $gdImage = match ($sourceFormat) {
-            'jpg', 'jpeg' => imagecreatefromjpeg($sourcePath),
-            'png' => imagecreatefrompng($sourcePath),
-            'webp' => imagecreatefromwebp($sourcePath),
-            'avif' => imagecreatefromavif($sourcePath),
+            'jpg', 'jpeg' => @imagecreatefromjpeg($sourcePath),
+            'png' => @imagecreatefrompng($sourcePath),
+            'webp' => @imagecreatefromwebp($sourcePath),
+            'gif' => @imagecreatefromgif($sourcePath),
+            'avif' => $this->avif->decode($sourcePath),
             default => false,
         };
 
-        if ($gdImage === false) {
+        if (! $gdImage instanceof \GdImage) {
             throw new \RuntimeException('Resim işlenemedi.');
         }
 
@@ -159,17 +181,28 @@ class ImageConverterService
 
         $outputPath = $outputDir.'/'.uniqid('img_').'.'.$targetFormat;
 
-        $result = match ($targetFormat) {
-            'jpg' => imagejpeg($gdImage, $outputPath, $quality),
-            'png' => imagepng($gdImage, $outputPath, (int) floor((100 - $quality) * 9 / 100)),
-            'webp' => imagewebp($gdImage, $outputPath, $quality),
-            'avif' => imageavif($gdImage, $outputPath, $quality),
-            default => false,
-        };
+        try {
+            if ($targetFormat === 'avif') {
+                $this->avif->encode($gdImage, $outputPath, $quality);
+                $result = true;
+            } else {
+                $result = match ($targetFormat) {
+                    'jpg' => @imagejpeg($gdImage, $outputPath, $quality),
+                    'png' => @imagepng($gdImage, $outputPath, (int) floor((100 - $quality) * 9 / 100)),
+                    'webp' => @imagewebp($gdImage, $outputPath, $quality),
+                    default => false,
+                };
+            }
+        } finally {
+            imagedestroy($gdImage);
+        }
 
-        imagedestroy($gdImage);
+        // GD bazı kurulumlarda başarısızlığı sessizce 0 byte dosyayla geçiştirir.
+        if ($result === false || ! is_file($outputPath) || filesize($outputPath) === 0) {
+            if (is_file($outputPath)) {
+                @unlink($outputPath);
+            }
 
-        if ($result === false) {
             throw new \RuntimeException('Dönüştürme başarısız oldu.');
         }
 
