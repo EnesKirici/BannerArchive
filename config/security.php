@@ -65,6 +65,13 @@ return [
 
         // Dakikada izin verilen dönüştürme isteği (IP başına)
         'rate_limit_convert' => (int) env('CONVERT_RATE_LIMIT', 10),
+
+        // Tek HTTP isteğinde dönüştürmeye ayrılan süre (saniye); dolunca kalan
+        // dosyalar tarayıcıdan zincirlenen bir sonraki isteğe devredilir
+        'convert_budget_seconds' => (int) env('CONVERT_BUDGET_SECONDS', 8),
+
+        // Tek bir dosyanın dönüşümü için tanınan azami süre (saniye)
+        'convert_time_limit' => (int) env('CONVERT_TIME_LIMIT', 90),
     ],
 
     /*

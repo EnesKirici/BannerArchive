@@ -124,6 +124,10 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
 
     public function convertWithOptions(string $format, int $quality): void
     {
+        if ($this->busy) {
+            return;
+        }
+
         if (! in_array($format, $this->targetFormats, true)) {
             $this->message = 'Bu format şu anda kullanılamıyor.';
             $this->messageType = 'error';
@@ -136,6 +140,26 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
         $this->convert();
     }
 
+    public int $convertedInRun = 0;
+
+    /**
+     * Sırada bekleyen veya o an işlenen dosya var mı?
+     */
+    #[Computed]
+    public function busy(): bool
+    {
+        foreach ($this->convertedFiles as $file) {
+            if (in_array($file['status'], ['queued', 'converting'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Dönüşümü başlatır: bekleyen dosyaları sıraya alır ve ilk partiyi işler.
+     */
     public function convert(): void
     {
         if (empty($this->convertedFiles)) {
@@ -145,60 +169,131 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
             return;
         }
 
+        if ($this->busy) {
+            return;
+        }
+
         if ($this->isRateLimited('image-convert', (int) config('security.upload.rate_limit_convert', 10))) {
             return;
         }
 
-        $converter = app(ImageConverterService::class);
-        $convertedCount = 0;
+        $queued = 0;
 
-        foreach ($this->convertedFiles as $index => &$file) {
+        foreach ($this->convertedFiles as &$file) {
             if ($file['status'] === 'done') {
                 continue;
             }
 
-            if ($file['tempPath'] && file_exists($file['tempPath'])) {
-                $converter->cleanup($file['tempPath']);
+            $file['status'] = 'queued';
+            $file['error'] = null;
+            $queued++;
+        }
+        unset($file);
+
+        if ($queued === 0) {
+            $this->message = 'Tüm dosyalar zaten dönüştürülmüş.';
+            $this->messageType = 'success';
+
+            return;
+        }
+
+        $this->message = '';
+        $this->messageType = '';
+        $this->convertedInRun = 0;
+
+        $this->convertBatch();
+    }
+
+    /**
+     * Sıradaki dosyaları süre bütçesi dolana kadar işler; kalan varsa
+     * tarayıcıdan kendini yeniden çağırır. Böylece 20 büyük görsel bile
+     * PHP/nginx zaman sınırına takılmaz. Yalnızca convert() ile sıraya
+     * alınmış dosyalar üzerinde çalışır.
+     */
+    public function convertBatch(): void
+    {
+        $converter = app(ImageConverterService::class);
+        $budget = (int) config('security.upload.convert_budget_seconds', 8);
+        $startedAt = microtime(true);
+        $processed = 0;
+
+        foreach ($this->convertedFiles as &$file) {
+            if (! in_array($file['status'], ['queued', 'converting'], true)) {
+                continue;
             }
 
-            $file['status'] = 'converting';
+            // Her istek en az bir dosya işler; yoksa zincir hiç ilerlemez.
+            if ($processed > 0 && microtime(true) - $startedAt > $budget) {
+                break;
+            }
 
-            try {
-                $sourcePath = $file['tempUploadPath'];
+            $this->convertOne($file, $converter);
+            $processed++;
+        }
+        unset($file);
 
-                if (! file_exists($sourcePath)) {
-                    $file['status'] = 'error';
-                    $file['error'] = 'Dosya bulunamadı, lütfen tekrar yükleyin.';
+        foreach ($this->convertedFiles as &$file) {
+            if (in_array($file['status'], ['queued', 'converting'], true)) {
+                // Bir sonraki istek işlerken arayüzde dönen ikon görünsün.
+                $file['status'] = 'converting';
+                unset($file);
+                $this->js('$wire.convertBatch()');
 
-                    continue;
-                }
-
-                $outputPath = $converter->convert(
-                    $sourcePath,
-                    $file['originalFormat'],
-                    $this->targetFormat,
-                    $this->quality
-                );
-
-                $outputInfo = $converter->getImageInfo($outputPath);
-
-                $file['convertedSize'] = $outputInfo['size'];
-                $file['convertedWidth'] = $outputInfo['width'];
-                $file['convertedHeight'] = $outputInfo['height'];
-                $file['convertedFormat'] = $this->targetFormat;
-                $file['tempPath'] = $outputPath;
-                $file['status'] = 'done';
-                $convertedCount++;
-            } catch (\Throwable $e) {
-                $file['status'] = 'error';
-                $file['error'] = $e->getMessage();
+                return;
             }
         }
         unset($file);
 
-        if ($convertedCount > 0) {
-            $this->message = $convertedCount . ' dosya başarıyla dönüştürüldü.';
+        if ($this->convertedInRun > 0) {
+            $this->message = $this->convertedInRun . ' dosya başarıyla dönüştürüldü.';
             $this->messageType = 'success';
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $file
+     */
+    private function convertOne(array &$file, ImageConverterService $converter): void
+    {
+        if ($file['tempPath'] && file_exists($file['tempPath'])) {
+            $converter->cleanup($file['tempPath']);
+            $file['tempPath'] = null;
+        }
+
+        $file['status'] = 'converting';
+
+        try {
+            $sourcePath = $file['tempUploadPath'];
+
+            if (! file_exists($sourcePath)) {
+                $file['status'] = 'error';
+                $file['error'] = 'Dosya bulunamadı, lütfen tekrar yükleyin.';
+
+                return;
+            }
+
+            // Her dosya kendi süre payını alır; php.ini'deki 30 sn tüm parti için yetmiyor.
+            set_time_limit((int) config('security.upload.convert_time_limit', 90));
+
+            $outputPath = $converter->convert(
+                $sourcePath,
+                $file['originalFormat'],
+                $this->targetFormat,
+                $this->quality
+            );
+
+            $outputInfo = $converter->getImageInfo($outputPath);
+
+            $file['convertedSize'] = $outputInfo['size'];
+            $file['convertedWidth'] = $outputInfo['width'];
+            $file['convertedHeight'] = $outputInfo['height'];
+            $file['convertedFormat'] = $this->targetFormat;
+            $file['tempPath'] = $outputPath;
+            $file['status'] = 'done';
+            $this->convertedInRun++;
+        } catch (\Throwable $e) {
+            $file['status'] = 'error';
+            $file['error'] = $e->getMessage();
         }
     }
 
@@ -702,17 +797,27 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
                     <button
                         @click="$wire.convertWithOptions(fmt, parseInt(qty))"
                         wire:loading.attr="disabled"
-                        wire:target="convertWithOptions, convert"
+                        wire:target="convertWithOptions, convert, convertBatch"
+                        @disabled($this->busy)
                         type="button"
                         class="bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl px-5 py-2 font-bold text-sm flex items-center gap-2 transition-all shadow-lg shadow-fuchsia-600/20"
                     >
-                        <span wire:loading.remove wire:target="convertWithOptions, convert">
+                        <span wire:loading.remove wire:target="convertWithOptions, convert, convertBatch" @class(['hidden' => $this->busy])>
                             <svg class="w-4 h-4 inline -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                             </svg>
                             Dönüştür
                         </span>
-                        <span wire:loading wire:target="convertWithOptions, convert" class="flex items-center gap-2">
+                        @if($this->busy)
+                            <span wire:loading.remove wire:target="convertWithOptions, convert, convertBatch" class="flex items-center gap-2">
+                                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                </svg>
+                                Dönüştürülüyor...
+                            </span>
+                        @endif
+                        <span wire:loading wire:target="convertWithOptions, convert, convertBatch" class="flex items-center gap-2">
                             <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
@@ -731,6 +836,7 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
                     $statusColor = match($file['status']) {
                         'done' => ($file['convertedSize'] < $file['originalSize'] ? 'bg-emerald-500' : 'bg-amber-500'),
                         'converting' => 'bg-fuchsia-500 animate-pulse',
+                        'queued' => 'bg-fuchsia-500/40',
                         'error' => 'bg-red-500',
                         default => 'bg-neutral-700',
                     };
@@ -788,6 +894,11 @@ new #[Layout('layouts.tool')] #[Title('Resim Dönüştürücü')] class extends 
                                     </svg>
                                     <div class="w-3 h-3 border-[1.5px] border-neutral-700 border-t-fuchsia-500 rounded-full animate-spin"></div>
                                     <span class="text-neutral-500">Dönüştürülüyor</span>
+                                @elseif($file['status'] === 'queued')
+                                    <svg class="w-3 h-3 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                    </svg>
+                                    <span class="text-neutral-500">Sırada</span>
                                 @elseif($file['status'] === 'error')
                                     <svg class="w-3 h-3 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
