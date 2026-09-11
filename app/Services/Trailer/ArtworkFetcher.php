@@ -42,7 +42,7 @@ final class ArtworkFetcher
         $logo = $this->grab($images['logos'] ?? [], ['tr', 'en'], null, 'logo');
 
         return new ThumbnailPayload(
-            title: (string) ($data['title'] ?? $data['name'] ?? $data['original_title'] ?? 'İsimsiz'),
+            title: self::titleFrom($data),
             poster: $poster['file'],
             backdrop: $backdrop['file'],
             logo: $logo['file'],
@@ -52,6 +52,36 @@ final class ArtworkFetcher
             brandWhite: (bool) config('trailer.brand.white', false),
             logoLanguage: $logo['file'] !== null ? $logo['language'] : null,
         );
+    }
+
+    /**
+     * Kapağa basılacak film adı: Türkçe → İngilizce → TMDB'nin döndürdüğü.
+     *
+     * TMDB `language=tr-TR` ile istenince `title` Türkçe çevirisi varsa onu,
+     * YOKSA ORİJİNAL adı verir — İngilizceyi değil. "Cats in the Museum 2"nin
+     * Türkçe çevirisi TMDB'de yok, orijinali Rusça (Коты Эрмитажа 2…): kapak
+     * fontunda Kiril olmadığı için başlık kutu kutu çıktı (2026-09-11).
+     * Bu yüzden `translations` da istenir ve sıra tr → en → ne döndüyse o.
+     * Türkçe dağıtımcı adı TMDB'de olmadığında panelden elle yazılabilir.
+     *
+     * @param  array<string, mixed>  $data  TMDB kaydı (append_to_response=translations)
+     */
+    public static function titleFrom(array $data): string
+    {
+        $translations = $data['translations']['translations'] ?? [];
+        foreach (['tr', 'en'] as $lang) {
+            foreach (is_array($translations) ? $translations : [] as $t) {
+                if (($t['iso_639_1'] ?? null) !== $lang) {
+                    continue;
+                }
+                $title = trim((string) ($t['data']['title'] ?? $t['data']['name'] ?? ''));
+                if ($title !== '') {
+                    return $title;
+                }
+            }
+        }
+
+        return (string) ($data['title'] ?? $data['name'] ?? $data['original_title'] ?? 'İsimsiz');
     }
 
     /**
@@ -158,12 +188,13 @@ final class ArtworkFetcher
     {
         $type = in_array($type, ['movie', 'tv'], true) ? $type : 'movie';
 
+        // v2: translations eklendi (bkz. titleFrom) — eski önbellek anahtarı geçersiz.
         $data = $this->tmdb->remember(
-            "trailer_artwork_{$type}_{$id}",
+            "trailer_artwork_v2_{$type}_{$id}",
             now()->addHours(6),
             fn () => $this->tmdb->get("/{$type}/{$id}", [
                 'language' => 'tr-TR',
-                'append_to_response' => 'images',
+                'append_to_response' => 'images,translations',
                 'include_image_language' => 'tr,en,null',
             ]),
         );
