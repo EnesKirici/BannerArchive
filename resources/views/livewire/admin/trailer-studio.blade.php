@@ -54,6 +54,11 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
     #[Session]
     public string $logoMode = 'auto';
 
+    /** Elle yazılan film adı (2026-09-11): TMDB'de Türkçe ad yoksa (Kediler Müzede 2
+        gibi dağıtımcı adı) buraya yazılır, logo yerine bu metin basılır. Filme
+        özgü → oturumda SAKLANMAZ, yeni film seçilince sıfırlanır. */
+    public string $customTitle = '';
+
     #[Session]
     public bool $showMeta = true;
 
@@ -174,6 +179,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->selectedTitle = (string) $chosen['title'];
         $this->backdropChoice = null;
         $this->logoChoice = null;
+        $this->customTitle = '';
         $this->posterChoice = null;
         $this->format = null;
         $this->thumbnails = [];
@@ -373,8 +379,13 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             $payload = $payload->withoutMeta();
         }
 
+        $elleBaslik = trim($this->customTitle);
+
         if ($this->logoMode === 'yok') {
             $payload = $payload->withoutTitle();
+        } elseif ($elleBaslik !== '') {
+            // Elle yazılan ad her şeyin önünde: logo değil bu metin basılır.
+            $payload = $payload->with(title: $elleBaslik)->withoutLogo();
         } elseif ($this->logoChoice !== null) {
             $this->notice = 'Logo elle seçildi — otomatik kurallar uygulanmadı.';
         } elseif ($this->logoMode === 'text') {
@@ -617,6 +628,13 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                             </label>
                         @endforeach
                     </div>
+                    @if($logoMode !== 'yok')
+                        <div class="mt-3">
+                            <input wire:model.blur="customTitle" type="text" placeholder="Film adını elle yaz — örn. Kediler Müzede 2"
+                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            <p class="mt-1 text-[11px] text-neutral-600">Boşsa TMDB'nin adı (Türkçe yoksa İngilizce). Doluysa logo yerine bu metin basılır.</p>
+                        </div>
+                    @endif
                     @if($logoLanguage)
                         <p class="mt-2 text-xs text-neutral-500">
                             Kullanılan logo dili: <span class="font-mono uppercase">{{ $logoLanguage }}</span>
@@ -788,7 +806,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     </div>
                 @endif
 
-                <div wire:loading.flex wire:target="chooseFormat,build,chooseBackdrop,chooseLogo,choosePoster,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon"
+                <div wire:loading.flex wire:target="chooseFormat,build,chooseBackdrop,chooseLogo,choosePoster,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon,customTitle"
                      class="absolute inset-0 z-10 bg-neutral-950/70 backdrop-blur-sm rounded-xl items-center justify-center">
                     <div class="flex items-center gap-3 text-sm text-neutral-300">
                         <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">

@@ -102,6 +102,17 @@ test('elle seçilen afiş payload üzerinde değişir', function () {
         ->and($payload->poster)->toBe('a.jpg');
 });
 
+test('elle yazılan film adı logoyu düşürüp metin olarak basılır', function () {
+    $payload = new ThumbnailPayload(title: 'Коты Эрмитажа 2', poster: 'a.jpg', logo: 'logo.png', logoLanguage: 'ru');
+
+    $elle = $payload->with(title: 'Kediler Müzede 2')->withoutLogo();
+
+    expect($elle->title)->toBe('Kediler Müzede 2')
+        ->and($elle->logo)->toBeNull()
+        ->and($elle->titleHidden)->toBeFalse()
+        ->and($payload->title)->toBe('Коты Эрмитажа 2');   // orijinal nesne değişmez
+});
+
 test('şerit ve film adı istenirse hiç basılmaz', function () {
     $work = storage_path('framework/testing/trailer-sade');
     $payload = (new ThumbnailPayload(
