@@ -21,7 +21,12 @@ class TrailerPreviewController extends Controller
 
         abort_unless(preg_match('/^[a-z0-9\-_]+\.jpg$/', $name) === 1, 404);
 
-        $path = storage_path('app/private/trailer/thumbnails/'.$request->user()->id.'/'.$name);
+        // `ozel-` öneki: kullanıcının kendi yüklediği afiş/arka plan (Kapak
+        // Stüdyosu elle mod). Üretilen kapaklarla aynı klasörde durmaz, çünkü
+        // o klasör her üretimde eski dosyalardan temizlenir.
+        $path = str_starts_with($name, 'ozel-')
+            ? rtrim((string) config('trailer.storage.artwork'), '/\\').'/ozel/'.$request->user()->id.'/'.$name
+            : storage_path('app/private/trailer/thumbnails/'.$request->user()->id.'/'.$name);
 
         abort_unless(is_file($path), 404);
 

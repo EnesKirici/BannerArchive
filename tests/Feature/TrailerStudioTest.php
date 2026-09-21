@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use App\Services\Trailer\ThumbnailComposer;
 use App\Services\Trailer\ThumbnailPayload;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Livewire\Volt\Volt;
 
@@ -145,4 +146,107 @@ test('biçim süzgeci yalnızca istenen kapakları üretir', function () {
         ->toBe(['shorts_cinema', 'shorts_poster']);
 
     File::deleteDirectory($work);
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
+/** Elle mod testleri: özel görseller ayrı, sonda silinen bir klasöre yazılır. */
+function ozelKlasor(): string
+{
+    $directory = storage_path('framework/testing/trailer-ozel');
+    config()->set('trailer.storage.artwork', $directory);
+
+    return $directory;
+}
+
+test('kendi görseliyle TMDB olmadan kapak üretilir', function () {
+    $directory = ozelKlasor();
+    actingAs(User::factory()->create(['is_admin' => true]));
+
+    $component = Volt::test('admin.trailer-studio')
+        ->call('startManual')
+        ->assertSet('manual', true)
+        ->assertSet('selectedId', null)
+        ->set('customTitle', 'Damat Mektebi')
+        ->set('customMeta', '2026 • Komedi')
+        ->set('posterUpload', UploadedFile::fake()->image('afis.jpg', 600, 900))
+        ->assertHasNoErrors()
+        ->assertSet('posterUpload', null);
+
+    $stored = $component->get('customPoster');
+
+    expect($stored)->toStartWith($directory)
+        ->and(basename((string) $stored))->toStartWith('ozel-poster-')
+        ->and(is_file((string) $stored))->toBeTrue();
+
+    $component->call('chooseFormat', 'both')
+        ->assertSet('error', null)
+        ->assertSee('Damat Mektebi');
+
+    expect($component->get('thumbnails'))->toHaveCount(5)
+        ->and($component->get('artwork'))->toBe(['afiş' => true, 'backdrop' => false, 'logo' => false]);
+
+    File::deleteDirectory($directory);
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
+test('elle modda görsel yüklenmeden kapak üretilmez', function () {
+    ozelKlasor();
+    actingAs(User::factory()->create(['is_admin' => true]));
+
+    $component = Volt::test('admin.trailer-studio')
+        ->call('startManual')
+        ->set('customTitle', 'Damat Mektebi');
+
+    expect($component->instance()->canChooseFormat())->toBeFalse();
+
+    $component->call('chooseFormat', 'video')
+        ->assertSet('thumbnails', []);
+
+    expect($component->get('error'))->toContain('en az bir görsel');
+});
+
+test('görsel olmayan dosya afiş olarak kabul edilmez', function () {
+    ozelKlasor();
+    actingAs(User::factory()->create(['is_admin' => true]));
+
+    Volt::test('admin.trailer-studio')
+        ->call('startManual')
+        ->set('posterUpload', UploadedFile::fake()->create('belge.pdf', 200, 'application/pdf'))
+        ->assertHasErrors(['posterUpload' => 'mimes'])
+        ->assertSet('customPoster', null);
+});
+
+test('yüklenen görsel kaldırılınca diskten de silinir', function () {
+    $directory = ozelKlasor();
+    actingAs(User::factory()->create(['is_admin' => true]));
+
+    $component = Volt::test('admin.trailer-studio')
+        ->call('startManual')
+        ->set('backdropUpload', UploadedFile::fake()->image('zemin.png', 1600, 900));
+
+    $stored = (string) $component->get('customBackdrop');
+    expect(is_file($stored))->toBeTrue();
+
+    $component->call('removeCustom', 'backdrop')
+        ->assertSet('customBackdrop', null);
+
+    expect(is_file($stored))->toBeFalse();
+
+    File::deleteDirectory($directory);
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
+test('önizleme ucu kullanıcının kendi yüklediği görseli sunar, başkasınınkini sunmaz', function () {
+    $directory = ozelKlasor();
+    $owner = User::factory()->create(['is_admin' => true]);
+    $other = User::factory()->create(['is_admin' => true]);
+
+    sahteAfis($directory.'/ozel/'.$owner->id.'/ozel-poster-abcdef123456.jpg');
+
+    actingAs($owner)
+        ->get('/admin/trailers/onizleme/ozel-poster-abcdef123456.jpg')
+        ->assertSuccessful();
+
+    actingAs($other)
+        ->get('/admin/trailers/onizleme/ozel-poster-abcdef123456.jpg')
+        ->assertNotFound();
+
+    File::deleteDirectory($directory);
 })->skip(! extension_loaded('gd'), 'GD eklentisi yok');

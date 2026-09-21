@@ -13,14 +13,44 @@
 use App\Services\TmdbClient;
 use App\Services\Trailer\ArtworkFetcher;
 use App\Services\Trailer\ThumbnailComposer;
+use App\Services\Trailer\ThumbnailPayload;
+use App\Support\Image\Canvas;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Component
 {
+    use WithFileUploads;
+
     public string $query = '';
+
+    /**
+     * Elle mod (2026-09-21): TMDB'de görseli olmayan (Damat Mektebi gibi) ya da
+     * hiç bulunmayan filmler için kapak, kullanıcının yüklediği afiş/arka
+     * planla üretilir. Film adı ve yıl • tür satırı da elle yazılır.
+     */
+    public bool $manual = false;
+
+    /** Elle modda yıl • tür satırı (örn. "2026 • Komedi"). Boşsa basılmaz. */
+    public string $customMeta = '';
+
+    /** Yükleme kutularının geçici dosyaları; diske alınır alınmaz boşaltılır. */
+    public $posterUpload = null;
+
+    public $backdropUpload = null;
+
+    /**
+     * Diske kaydedilmiş özel görsellerin tam yolu. TMDB seçiliyken de
+     * doldurulabilir: o zaman TMDB'ninki değil bunlar kullanılır.
+     */
+    public ?string $customPoster = null;
+
+    public ?string $customBackdrop = null;
 
     /** @var array<int, array<string, mixed>> */
     public array $results = [];
@@ -174,18 +204,10 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             return;
         }
 
+        $this->resetSelection();
         $this->selectedId = $id;
         $this->selectedType = (string) $chosen['type'];
         $this->selectedTitle = (string) $chosen['title'];
-        $this->backdropChoice = null;
-        $this->logoChoice = null;
-        $this->customTitle = '';
-        $this->posterChoice = null;
-        $this->format = null;
-        $this->thumbnails = [];
-        $this->artwork = [];
-        $this->notice = null;
-        $this->error = null;
 
         $artwork = app(ArtworkFetcher::class);
         $this->backdropOptions = $artwork->backdrops($this->selectedType, $id);
@@ -198,6 +220,169 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->js('$wire.prefetchArtwork()');
 
         $this->js('setTimeout(() => document.getElementById("kapak-turu")?.scrollIntoView({ behavior: "smooth", block: "center" }), 80)');
+    }
+
+    /**
+     * TMDB'siz başla: kullanıcı afişini/arka planını kendi yükler.
+     *
+     * Arama sonuçları ve önceki seçim temizlenir; film adı, yıl • tür ve
+     * görseller elle girildikten sonra biçim seçilir, kapaklar üretilir.
+     */
+    public function startManual(): void
+    {
+        $this->resetSelection();
+        $this->manual = true;
+        $this->results = [];
+
+        $this->js('setTimeout(() => document.getElementById("kapak-turu")?.scrollIntoView({ behavior: "smooth", block: "center" }), 80)');
+    }
+
+    /** Elle yüklenen görseli bırak; TMDB seçiliyse otomatik seçime dönülür. */
+    public function removeCustom(string $kind): void
+    {
+        $property = $kind === 'poster' ? 'customPoster' : 'customBackdrop';
+
+        if ($this->{$property} !== null) {
+            @unlink($this->{$property});
+            $this->{$property} = null;
+        }
+
+        if ($this->hasSelection() && $this->format !== null) {
+            $this->build(app(ArtworkFetcher::class), app(ThumbnailComposer::class));
+        }
+    }
+
+    /** Başlıkta gösterilecek ad: TMDB'ninki ya da elle yazılan. */
+    public function displayTitle(): string
+    {
+        if (! $this->manual) {
+            return $this->selectedTitle;
+        }
+
+        $title = trim($this->customTitle);
+
+        return $title !== '' ? $title : 'Kendi görselim';
+    }
+
+    /** Elle modda kapak üretmek için en az bir görsel gerekir. */
+    public function canChooseFormat(): bool
+    {
+        return ! $this->manual || $this->customPoster !== null || $this->customBackdrop !== null;
+    }
+
+    /** Önizleme ucuna verilecek dosya adı (özel görseller `ozel-` önekiyle sunulur). */
+    public function customPreviewName(string $kind): ?string
+    {
+        $path = $kind === 'poster' ? $this->customPoster : $this->customBackdrop;
+
+        return $path === null ? null : basename($path);
+    }
+
+    private function hasSelection(): bool
+    {
+        return $this->selectedId !== null || $this->manual;
+    }
+
+    /** Yeni içerik (TMDB ya da elle) seçilirken filme özgü her şeyi sıfırla. */
+    private function resetSelection(): void
+    {
+        $this->selectedId = null;
+        $this->manual = false;
+        $this->selectedTitle = '';
+        $this->backdropChoice = null;
+        $this->logoChoice = null;
+        $this->posterChoice = null;
+        $this->backdropOptions = [];
+        $this->logoOptions = [];
+        $this->posterOptions = [];
+        $this->customTitle = '';
+        $this->customMeta = '';
+        $this->format = null;
+        $this->thumbnails = [];
+        $this->artwork = [];
+        $this->notice = null;
+        $this->error = null;
+        $this->logoLanguage = null;
+
+        foreach (['customPoster', 'customBackdrop'] as $property) {
+            if ($this->{$property} !== null) {
+                @unlink($this->{$property});
+                $this->{$property} = null;
+            }
+        }
+    }
+
+    /**
+     * Yükleme kutusuna bırakılan görseli doğrula, ölçekle ve kalıcı klasöre al.
+     *
+     * Dosya JPEG'e çevrilerek yazılır: şablonlar GD ile çalışıyor, çok büyük
+     * kaynaklar belleği şişiriyor. 2400 px üstü kenarlar küçültülür; kapak
+     * 1280×720 / 1080×1920 olduğu için bu ölçü fazlasıyla yeterli.
+     */
+    private function storeUpload(string $property): void
+    {
+        $file = $this->{$property};
+
+        if (! $file instanceof TemporaryUploadedFile) {
+            return;
+        }
+
+        $kind = $property === 'posterUpload' ? 'poster' : 'backdrop';
+        $label = $kind === 'poster' ? 'Afiş' : 'Arka plan';
+
+        $this->validate([
+            $property => ['file', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
+        ], [
+            "{$property}.mimes" => "{$label} için JPG, PNG ya da WebP yükleyin.",
+            "{$property}.max" => "{$label} en fazla 15 MB olabilir.",
+        ]);
+
+        $directory = rtrim((string) config('trailer.storage.artwork'), '/\\').'/ozel/'.auth()->id();
+
+        if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            $this->error = 'Görsel klasörü oluşturulamadı.';
+            $this->{$property} = null;
+
+            return;
+        }
+
+        // Eski elle yüklemeler birikmesin: bir günden yaşlı olanlar gider.
+        foreach (glob($directory.'/*.jpg') ?: [] as $stale) {
+            if ((@filemtime($stale) ?: 0) < now()->subDay()->getTimestamp()) {
+                @unlink($stale);
+            }
+        }
+
+        $target = $directory.'/ozel-'.$kind.'-'.Str::lower(Str::random(12)).'.jpg';
+
+        try {
+            $canvas = Canvas::open($file->getRealPath());
+
+            if (max($canvas->width(), $canvas->height()) > 2400) {
+                $canvas = $canvas->contain(2400, 2400);
+            }
+
+            $canvas->toJpeg($target, 92);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $this->error = "{$label} görseli okunamadı: ".$exception->getMessage();
+            $this->{$property} = null;
+
+            return;
+        } finally {
+            $file->delete();
+            Canvas::flushDecoded();
+        }
+
+        $stored = $kind === 'poster' ? 'customPoster' : 'customBackdrop';
+
+        if ($this->{$stored} !== null) {
+            @unlink($this->{$stored});
+        }
+
+        $this->{$stored} = $target;
+        $this->{$property} = null;
+        $this->error = null;
     }
 
     /**
@@ -300,7 +485,12 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
     /** Ayarlardan biri değişince kapakları tazele. */
     public function updated(string $property, mixed $value = null): void
     {
-        if ($this->selectedId === null || $this->format === null || $property === 'query') {
+        // Yükleme kutuları: dosya önce diske alınır, sonra (biçim seçiliyse) kapak tazelenir.
+        if (in_array($property, ['posterUpload', 'backdropUpload'], true)) {
+            $this->storeUpload($property);
+        }
+
+        if (! $this->hasSelection() || $this->format === null || $property === 'query') {
             return;
         }
 
@@ -313,44 +503,30 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->notice = null;
         $this->thumbnails = [];
 
-        if ($this->selectedId === null || $this->format === null) {
+        if (! $this->hasSelection() || $this->format === null) {
             return;
         }
 
-        $payload = $artwork->fetch($this->selectedType, $this->selectedId);
+        $payload = $this->manual ? $this->manualPayload() : $this->tmdbPayload($artwork);
 
         if ($payload === null) {
-            $this->error = 'TMDB kaydı alınamadı. Bağlantı kesik olabilir.';
-
             return;
         }
 
-        // Arka plan elle seçildiyse TMDB'nin sıraladığını değil, onu kullan.
-        if ($this->backdropChoice !== null) {
-            $payload = $payload->withBackdrop(
-                $artwork->download($this->backdropChoice, (string) config('trailer.sizes.backdrop'))
-            );
+        // Kullanıcının yüklediği görseller her şeyin önünde: TMDB seçiliyken
+        // bile afiş/arka plan yüklendiyse onlar kullanılır.
+        if ($this->customPoster !== null) {
+            $payload = $payload->withPoster($this->customPoster);
         }
 
-        // Afiş de elle seçilebiliyor; Shorts kapaklarının zemini ve karttaki
-        // afiş bu seçime göre değişir (video şablonlarındaki afiş kartı da).
-        if ($this->posterChoice !== null) {
-            $payload = $payload->withPoster(
-                $artwork->download($this->posterChoice, (string) config('trailer.sizes.poster'))
-            );
+        if ($this->customBackdrop !== null) {
+            $payload = $payload->withBackdrop($this->customBackdrop);
         }
 
-        // Logo da elle seçilebiliyor; seçildiyse "film adı nasıl yazılsın"
-        // kuralları devreye girmez, doğrudan seçilen kullanılır.
-        if ($this->logoChoice !== null) {
-            $payload = $payload->withLogo(
-                $artwork->download($this->logoChoice, (string) config('trailer.sizes.logo'))
-            );
+        if (! $payload->hasArtwork()) {
+            $this->error = 'Kapak için en az bir görsel gerekli: afiş ya da arka plan yükleyin.';
 
-            $chosenLogo = collect($this->logoOptions)->firstWhere('path', $this->logoChoice);
-            $this->logoLanguage = is_array($chosenLogo) ? ($chosenLogo['dil'] ?? null) : null;
-        } else {
-            $this->logoLanguage = $payload->logoLanguage;
+            return;
         }
 
         $this->artwork = [
@@ -381,7 +557,13 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
 
         $elleBaslik = trim($this->customTitle);
 
-        if ($this->logoMode === 'yok') {
+        if ($this->manual) {
+            // Elle modda logo yok; ad yazıldıysa metin basılır, boşsa hiç basılmaz.
+            if ($elleBaslik === '') {
+                $payload = $payload->withoutTitle();
+                $this->notice = 'Film adı yazılmadı — kapakta ad basılmıyor.';
+            }
+        } elseif ($this->logoMode === 'yok') {
             $payload = $payload->withoutTitle();
         } elseif ($elleBaslik !== '') {
             // Elle yazılan ad her şeyin önünde: logo değil bu metin basılır.
@@ -397,6 +579,73 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             $this->notice = 'TMDB’de Türkçe logo yok, '.mb_strtoupper((string) $payload->logoLanguage).' logo kullanıldı.';
         }
 
+        $this->renderThumbnails($payload, $composer);
+    }
+
+    /** Elle mod: yalnızca kullanıcının yazdıkları ve yüklediklerinden kurulan payload. */
+    private function manualPayload(): ThumbnailPayload
+    {
+        $title = trim($this->customTitle);
+        $meta = trim($this->customMeta);
+
+        $this->logoLanguage = null;
+
+        return new ThumbnailPayload(
+            title: $title !== '' ? $title : 'İsimsiz',
+            poster: $this->customPoster,
+            backdrop: $this->customBackdrop,
+            ribbon: (string) config('trailer.defaults.ribbon'),
+            meta: $meta !== '' ? $meta : null,
+            accent: (string) config('trailer.defaults.accent'),
+            brandWhite: (bool) config('trailer.brand.white', false),
+        );
+    }
+
+    /** TMDB modu: kayıt çekilir, elle seçilen arka plan/afiş/logo uygulanır. */
+    private function tmdbPayload(ArtworkFetcher $artwork): ?ThumbnailPayload
+    {
+        $payload = $artwork->fetch($this->selectedType, (int) $this->selectedId);
+
+        if ($payload === null) {
+            $this->error = 'TMDB kaydı alınamadı. Bağlantı kesik olabilir.';
+
+            return null;
+        }
+
+        // Arka plan elle seçildiyse TMDB'nin sıraladığını değil, onu kullan.
+        if ($this->backdropChoice !== null) {
+            $payload = $payload->withBackdrop(
+                $artwork->download($this->backdropChoice, (string) config('trailer.sizes.backdrop'))
+            );
+        }
+
+        // Afiş de elle seçilebiliyor; Shorts kapaklarının zemini ve karttaki
+        // afiş bu seçime göre değişir (video şablonlarındaki afiş kartı da).
+        if ($this->posterChoice !== null) {
+            $payload = $payload->withPoster(
+                $artwork->download($this->posterChoice, (string) config('trailer.sizes.poster'))
+            );
+        }
+
+        // Logo da elle seçilebiliyor; seçildiyse "film adı nasıl yazılsın"
+        // kuralları devreye girmez, doğrudan seçilen kullanılır.
+        if ($this->logoChoice !== null) {
+            $payload = $payload->withLogo(
+                $artwork->download($this->logoChoice, (string) config('trailer.sizes.logo'))
+            );
+
+            $chosenLogo = collect($this->logoOptions)->firstWhere('path', $this->logoChoice);
+            $this->logoLanguage = is_array($chosenLogo) ? ($chosenLogo['dil'] ?? null) : null;
+        } else {
+            $this->logoLanguage = $payload->logoLanguage;
+        }
+
+        return $payload;
+    }
+
+    /** Payload hazır: kapakları diske yaz, önizleme listesini doldur. */
+    private function renderThumbnails(ThumbnailPayload $payload, ThumbnailComposer $composer): void
+    {
         $directory = storage_path('app/private/trailer/thumbnails/'.auth()->id());
 
         // Tur başında her şeyi silmek, üst üste binen isteklerde (ayar değişimi
@@ -478,9 +727,18 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                 </svg>
                 Ara
             </button>
+            {{-- TMDB'de bulunmayan ya da görseli olmayan film: kendi afişiyle üret. --}}
+            <button type="button" wire:click="startManual"
+                    class="px-5 py-3 rounded-lg border font-semibold transition-colors flex items-center justify-center gap-2 {{ $manual ? 'border-fuchsia-500 bg-fuchsia-500/10 text-white' : 'border-white/10 hover:border-fuchsia-500/50 hover:bg-white/5 text-neutral-200' }}"
+                    wire:loading.attr="disabled" wire:target="startManual">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+                </svg>
+                Kendi görselimle
+            </button>
         </form>
 
-        @if($error)
+        @if($error && ! $manual)
             <p class="mt-4 text-sm text-red-400">{{ $error }}</p>
         @endif
 
@@ -507,25 +765,65 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
     </div>
 
     {{-- ------------------------------------------- Kapak türü (video / shorts) --}}
-    @if($selectedId)
+    @if($selectedId || $manual)
         <div id="kapak-turu" class="bg-neutral-900 rounded-xl border border-white/5 p-6 scroll-mt-24">
+            @if($manual)
+                {{-- Elle mod: TMDB yok; ad, yıl • tür ve görseller buradan girilir. --}}
+                <div class="mb-5">
+                    <h3 class="font-semibold">
+                        Kendi görselimle kapak
+                        <span class="text-neutral-500 font-normal">— TMDB'siz</span>
+                    </h3>
+                    <p class="mt-1 text-xs text-neutral-500">
+                        Film adını yazın, afiş ya da arka plan yükleyin; sonra kapak türünü seçin. Yüklediğiniz görseller TMDB'ye gönderilmez, sadece bu panelde kullanılır.
+                    </p>
+
+                    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium mb-1.5">Film adı</label>
+                            <input wire:model.blur="customTitle" type="text" placeholder="Örn. Damat Mektebi"
+                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            <p class="mt-1 text-[11px] text-neutral-600">Kapağa büyük harflerle basılır. Boş bırakılırsa ad basılmaz.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1.5">Yıl • tür <span class="text-neutral-600 font-normal">(isteğe bağlı)</span></label>
+                            <input wire:model.blur="customMeta" type="text" placeholder="Örn. 2026 • Komedi"
+                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            <p class="mt-1 text-[11px] text-neutral-600">Afişin altındaki küçük satır. "Yıl • tür satırını göster" kapalıysa basılmaz.</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        @include('admin.partials.trailer-custom-uploads')
+                    </div>
+
+                    @if($error)
+                        <p class="mt-3 text-sm text-red-400">{{ $error }}</p>
+                    @endif
+                </div>
+            @endif
+
             <div class="flex items-start justify-between flex-wrap gap-3">
                 <div>
                     <h3 class="font-semibold">
-                        {{ $selectedTitle }}
+                        {{ $this->displayTitle() }}
                         <span class="text-neutral-500 font-normal">— hangi kapak üretilsin?</span>
                     </h3>
                     <p class="mt-1 text-xs text-neutral-500">
-                        <span wire:loading wire:target="prefetchArtwork" class="inline-flex items-center gap-2">
-                            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                            </svg>
-                            Siz seçerken görseller arka planda indiriliyor…
-                        </span>
-                        <span wire:loading.remove wire:target="prefetchArtwork">
-                            {{ $artwork !== [] ? 'Görseller hazır — türü seçince kapaklar üretilir.' : 'Kapak türünü seçin.' }}
-                        </span>
+                        @if($manual)
+                            {{ $this->canChooseFormat() ? 'Görsel yüklendi — türü seçince kapaklar üretilir.' : 'Önce afiş ya da arka plan yükleyin.' }}
+                        @else
+                            <span wire:loading wire:target="prefetchArtwork" class="inline-flex items-center gap-2">
+                                <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                </svg>
+                                Siz seçerken görseller arka planda indiriliyor…
+                            </span>
+                            <span wire:loading.remove wire:target="prefetchArtwork">
+                                {{ $artwork !== [] ? 'Görseller hazır — türü seçince kapaklar üretilir.' : 'Kapak türünü seçin.' }}
+                            </span>
+                        @endif
                     </p>
                 </div>
                 @if($artwork)
@@ -547,7 +845,8 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                 ] as $key => [$baslik, $aciklama, $ikon])
                     <button type="button" wire:click="chooseFormat('{{ $key }}')"
                             wire:loading.attr="disabled" wire:target="chooseFormat"
-                            class="group text-left px-4 py-4 rounded-xl border transition-colors disabled:opacity-60 {{ $format === $key ? 'border-fuchsia-500 bg-fuchsia-500/10' : 'border-white/10 hover:border-fuchsia-500/50 hover:bg-white/5' }}">
+                            @disabled(! $this->canChooseFormat())
+                            class="group text-left px-4 py-4 rounded-xl border transition-colors disabled:opacity-40 disabled:cursor-not-allowed {{ $format === $key ? 'border-fuchsia-500 bg-fuchsia-500/10' : 'border-white/10 hover:border-fuchsia-500/50 hover:bg-white/5' }}">
                         <span class="flex items-center gap-3">
                             <svg class="w-7 h-7 shrink-0 {{ $format === $key ? 'text-fuchsia-400' : 'text-neutral-400 group-hover:text-fuchsia-400' }} transition-colors"
                                  fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -572,13 +871,13 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         </div>
     @endif
 
-    @if($selectedId && $format)
+    @if(($selectedId || $manual) && $format)
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
             {{-- ------------------------------------------------------- Ayarlar --}}
             <div class="bg-neutral-900 rounded-xl border border-white/5 p-6 space-y-6 h-fit">
                 <div>
-                    <h3 class="font-semibold text-lg">{{ $selectedTitle }}</h3>
+                    <h3 class="font-semibold text-lg">{{ $this->displayTitle() }}</h3>
                     <div class="mt-2 flex flex-wrap gap-2">
                         @foreach($artwork as $name => $found)
                             <span class="px-2 py-0.5 text-[11px] rounded {{ $found ? 'bg-emerald-500/10 text-emerald-400' : 'bg-neutral-800 text-neutral-500' }}">
@@ -613,6 +912,21 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     </div>
                 </div>
 
+                @if($manual)
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium mb-1.5">Film adı</label>
+                            <input wire:model.blur="customTitle" type="text" placeholder="Örn. Damat Mektebi"
+                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            <p class="mt-1 text-[11px] text-neutral-600">Büyük harflerle basılır. Boş bırakılırsa ad basılmaz.</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1.5">Yıl • tür</label>
+                            <input wire:model.blur="customMeta" type="text" placeholder="Örn. 2026 • Komedi"
+                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                        </div>
+                    </div>
+                @else
                 <div>
                     <label class="block text-sm font-medium mb-2">Film adı nasıl yazılsın</label>
                     <div class="space-y-2">
@@ -677,15 +991,30 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                         </div>
                     @endif
                 </div>
+                @endif
 
                 <label class="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" wire:model.live="showMeta" class="accent-fuchsia-500 w-4 h-4">
                     <span class="text-sm">Yıl • tür satırını göster</span>
                 </label>
 
+                {{-- Kendi görselleri: TMDB seçiliyken de yüklenebilir, öncelik bunlardadır. --}}
+                <div>
+                    <label class="block text-sm font-medium mb-2">
+                        Kendi görsellerim
+                        @unless($manual)
+                            <span class="text-neutral-600 font-normal">(TMDB'ninkinin yerine geçer)</span>
+                        @endunless
+                    </label>
+                    @include('admin.partials.trailer-custom-uploads')
+                    @if($error)
+                        <p class="mt-2 text-xs text-red-400">{{ $error }}</p>
+                    @endif
+                </div>
+
                 {{-- Görsel seçiciler aktif biçime göre değişir: video kapağının
                      zemini backdrop, shorts kapağının zemini afiştir. --}}
-                @if($this->activeContext() === 'video' && $backdropOptions)
+                @if(! $manual && $customBackdrop === null && $this->activeContext() === 'video' && $backdropOptions)
                     <div>
                         <label class="block text-sm font-medium mb-2">
                             Arka plan görseli
@@ -710,7 +1039,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     </div>
                 @endif
 
-                @if($this->activeContext() === 'shorts' && $posterOptions)
+                @if(! $manual && $customPoster === null && $this->activeContext() === 'shorts' && $posterOptions)
                     <div>
                         <label class="block text-sm font-medium mb-2">
                             Afiş görseli
@@ -806,7 +1135,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     </div>
                 @endif
 
-                <div wire:loading.flex wire:target="chooseFormat,build,chooseBackdrop,chooseLogo,choosePoster,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon,customTitle"
+                <div wire:loading.flex wire:target="chooseFormat,build,chooseBackdrop,chooseLogo,choosePoster,removeCustom,posterUpload,backdropUpload,ribbonKey,logoMode,showMeta,accentMode,accent,brand,brandStyle,customRibbon,customTitle,customMeta"
                      class="absolute inset-0 z-10 bg-neutral-950/70 backdrop-blur-sm rounded-xl items-center justify-center">
                     <div class="flex items-center gap-3 text-sm text-neutral-300">
                         <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -850,7 +1179,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     </div>
                 @empty
                     <div class="bg-neutral-900 rounded-xl border border-white/5 p-10 text-center text-neutral-500">
-                        Bu yapım için kapak üretilemedi — TMDB'de yeterli görsel yok.
+                        {{ $manual ? 'Kapak üretilemedi — afiş ya da arka plan yükleyin.' : 'Bu yapım için kapak üretilemedi — TMDB’de yeterli görsel yok. Soldan kendi görselinizi yükleyebilirsiniz.' }}
                     </div>
                 @endforelse
             </div>
