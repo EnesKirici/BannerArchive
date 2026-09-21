@@ -331,10 +331,10 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $label = $kind === 'poster' ? 'Afiş' : 'Arka plan';
 
         $this->validate([
-            $property => ['file', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
+            $property => ['file', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
         ], [
             "{$property}.mimes" => "{$label} için JPG, PNG ya da WebP yükleyin.",
-            "{$property}.max" => "{$label} en fazla 15 MB olabilir.",
+            "{$property}.max" => "{$label} en fazla 10 MB olabilir.",
         ]);
 
         $directory = rtrim((string) config('trailer.storage.artwork'), '/\\').'/ozel/'.auth()->id();
