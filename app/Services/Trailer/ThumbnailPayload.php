@@ -27,6 +27,12 @@ final readonly class ThumbnailPayload
         public ?string $logoLanguage = null,
         /** Film adı (logo/yazı) hiç basılmasın — afişte zaten yazıyorsa. */
         public bool $titleHidden = false,
+        /** alt = başlığın altında (varsayılan) · ust = kapağın tepesinde */
+        public string $ribbonPosition = 'alt',
+        /** Şeridin şablondaki boyutuna çarpan. */
+        public float $ribbonScale = 1.0,
+        /** Şeridin altına yazılan ikinci satır (örn. "Yalnızca Avşar Sinemalarında"). */
+        public ?string $tagline = null,
     ) {}
 
     /** Boş ya da null değerler yok sayılarak üzerine yazılmış bir kopya üret. */
@@ -90,6 +96,14 @@ final readonly class ThumbnailPayload
         return $this->copy(logo: $file, setLogo: true);
     }
 
+    /** Şeridin yeri, boyutu ve altındaki ikinci satır. */
+    public function withLayout(string $ribbonPosition, float $ribbonScale, ?string $tagline): self
+    {
+        $tagline = $tagline !== null && trim($tagline) !== '' ? trim($tagline) : null;
+
+        return $this->copy(ribbonPosition: $ribbonPosition, ribbonScale: $ribbonScale, tagline: $tagline, setTagline: true);
+    }
+
     /** Vurgu rengini temizle ki afişin baskın renginden çıkarılsın. */
     public function withoutAccent(): self
     {
@@ -119,6 +133,10 @@ final readonly class ThumbnailPayload
         bool $dropAccent = false,
         bool $dropRibbon = false,
         bool $hideTitle = false,
+        ?string $ribbonPosition = null,
+        ?float $ribbonScale = null,
+        ?string $tagline = null,
+        bool $setTagline = false,
     ): self {
         return new self(
             title: $title ?? $this->title,
@@ -132,6 +150,9 @@ final readonly class ThumbnailPayload
             brandWhite: $brandWhite ?? $this->brandWhite,
             logoLanguage: $this->logoLanguage,
             titleHidden: $hideTitle || $this->titleHidden,
+            ribbonPosition: $ribbonPosition ?? $this->ribbonPosition,
+            ribbonScale: $ribbonScale ?? $this->ribbonScale,
+            tagline: $setTagline ? $tagline : $this->tagline,
         );
     }
 

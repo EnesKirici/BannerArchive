@@ -10,6 +10,9 @@ namespace App\Services\Trailer;
  */
 final readonly class CoverSettings
 {
+    /** Şerit boyutunun şablondaki ölçüye çarpanı. */
+    public const RIBBON_SCALES = ['kucuk' => 0.82, 'normal' => 1.0, 'buyuk' => 1.35];
+
     public function __construct(
         /** Boş metin "şerit basılmasın" demektir. */
         public string $ribbon,
@@ -25,6 +28,12 @@ final readonly class CoverSettings
         public bool $brandWhite = false,
         /** Logo elle seçildiyse "film adı nasıl yazılsın" kuralları uygulanmaz. */
         public bool $logoChosen = false,
+        /** alt = başlığın altında · ust = kapağın tepesinde */
+        public string $ribbonPosition = 'alt',
+        /** kucuk · normal · buyuk */
+        public string $ribbonSize = 'normal',
+        /** Şeridin altındaki ikinci satır; boşsa basılmaz. */
+        public string $tagline = '',
     ) {}
 
     /** Panelin şerit anahtarından basılacak metni çöz: yok → boş, ozel → serbest metin. */
@@ -51,6 +60,11 @@ final readonly class CoverSettings
         // with() boş değeri yok saydığı için "şerit olmasın" ayrı ele alınıyor.
         $ribbon = trim($this->ribbon);
         $payload = $ribbon === '' ? $payload->withoutRibbon() : $payload->with(ribbon: $ribbon);
+        $payload = $payload->withLayout(
+            $this->ribbonPosition === 'ust' ? 'ust' : 'alt',
+            self::RIBBON_SCALES[$this->ribbonSize] ?? 1.0,
+            $this->tagline,
+        );
 
         $payload = match ($this->accentMode) {
             'oto' => $payload->withoutAccent(),

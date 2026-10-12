@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\TrailerPreviewController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\McpCoverDownloadController;
+use App\Http\Controllers\McpCoverUploadController;
 use App\Http\Controllers\TMDBController;
 use App\Http\Controllers\VideoDownloadController;
 use Illuminate\Support\Facades\Route;
@@ -68,3 +69,9 @@ Route::get('/kapak/{user}/{batch}/{file}', McpCoverDownloadController::class)
     ->name('mcp.covers.download')
     ->middleware(['signed', 'throttle:60,1'])
     ->where(['user' => '[0-9]+', 'batch' => '[a-z0-9]{16}', 'file' => '[a-z0-9\-_]+\.jpg']);
+
+// Claude sohbetinden kapak için kendi görselini yükleme sayfası (süreli imza).
+Route::middleware(['signed', 'throttle:20,1'])->whereNumber('user')->group(function () {
+    Route::get('/kapak-gorseli/{user}', [McpCoverUploadController::class, 'show'])->name('mcp.covers.upload');
+    Route::post('/kapak-gorseli/{user}', [McpCoverUploadController::class, 'store'])->name('mcp.covers.upload.store');
+});

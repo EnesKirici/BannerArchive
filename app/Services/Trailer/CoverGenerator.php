@@ -4,6 +4,9 @@ namespace App\Services\Trailer;
 
 use App\Services\TmdbClient;
 use App\Support\Image\Canvas;
+use GuzzleHttp\Psr7\Uri;
+use GuzzleHttp\Psr7\UriResolver;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -20,6 +23,16 @@ final class CoverGenerator
 {
     /** İndirme bağlantıları ve üretilen klasörler bu kadar yaşar. */
     public const LINK_DAYS = 3;
+
+    /** Görsel yükleme sayfasının bağlantısı bu kadar dakika geçerli. */
+    public const UPLOAD_MINUTES = 30;
+
+    /** Yüklenen görsellerin klasörü; üretim klasörlerinin yanında durur. */
+    private const UPLOADS = 'yuklenen';
+
+    private const UPLOAD_FILES = ['afis' => 'afis.jpg', 'arka_plan' => 'arka-plan.jpg'];
+
+    private const MAX_REMOTE_BYTES = 15 * 1024 * 1024;
 
     public function __construct(
         private readonly TmdbClient $tmdb,
@@ -85,13 +98,11 @@ final class CoverGenerator
     }
 
     /**
-     * Kapakları üret.
+     * TMDB kaydından payload; seçilen arka plan/afiş/logo uygulanır.
      *
-     * @param  array<int, string>  $formats  'video' ve/veya 'shorts'
      * @param  array{arka_plan?: string|null, afis?: string|null, logo?: string|null}  $choices  TMDB dosya yolları
-     * @return array{title: string, batch: string, notice: string|null, rendered: array<string, string>}
      */
-    public function generate(int $userId, string $type, int $id, CoverSettings $settings, array $formats, array $choices = []): array
+    public function tmdbPayload(string $type, int $id, array $choices = []): ThumbnailPayload
     {
         $payload = $this->artwork->fetch($type, $id);
 
@@ -111,11 +122,30 @@ final class CoverGenerator
             $payload = $payload->withLogo($this->artwork->download($choices['logo'], (string) config('trailer.sizes.logo')));
         }
 
+        return $payload;
+    }
+
+    /** TMDB'de olmayan yapım: yalnızca yüklenen görseller ve elle yazılan ad. */
+    public function manualPayload(string $title, ?string $meta = null): ThumbnailPayload
+    {
+        $meta = $meta !== null && trim($meta) !== '' ? trim($meta) : null;
+
+        return new ThumbnailPayload(title: $title, ribbon: (string) config('trailer.defaults.ribbon'), meta: $meta);
+    }
+
+    /**
+     * Kapakları üret.
+     *
+     * @param  array<int, string>  $formats  'video' ve/veya 'shorts'
+     * @return array{title: string, batch: string, notice: string|null, rendered: array<string, string>}
+     */
+    public function generate(int $userId, ThumbnailPayload $payload, CoverSettings $settings, array $formats, bool $manual = false): array
+    {
         if (! $payload->hasArtwork()) {
-            throw new RuntimeException('Bu kayıt için TMDB\'de afiş ya da arka plan yok. Kapak Stüdyosu\'ndaki "Kendi görselimle" seçeneğini kullanın.');
+            throw new RuntimeException('Kapak için görsel yok: TMDB\'de afiş ya da arka plan bulunmadı. gorsel_yukleme_linki ile kendi görselini yükle ya da görselin adresini (afis_url / arka_plan_url) ver.');
         }
 
-        [$payload, $notice] = $settings->apply($payload);
+        [$payload, $notice] = $settings->apply($payload, $manual);
 
         $batch = Str::lower(Str::random(16));
         $directory = $this->userDirectory($userId).'/'.$batch;
@@ -138,6 +168,108 @@ final class CoverGenerator
             'notice' => $notice,
             'rendered' => $rendered,
         ];
+    }
+
+    /** Telefondan görsel yüklenecek sayfanın süreli bağlantısı. */
+    public function uploadUrl(int $userId): string
+    {
+        return URL::temporarySignedRoute('mcp.covers.upload', now()->addMinutes(self::UPLOAD_MINUTES), ['user' => $userId]);
+    }
+
+    /**
+     * Yüklenen ya da adresten indirilen görseli kullanıcının görsel yuvasına
+     * yaz. Her çeşitten tek görsel tutulur; yenisi eskisinin yerine geçer.
+     */
+    public function storeUpload(int $userId, string $kind, string $source): string
+    {
+        $directory = $this->userDirectory($userId).'/'.self::UPLOADS;
+
+        if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            throw new RuntimeException('Görsel klasörü oluşturulamadı.');
+        }
+
+        try {
+            $canvas = Canvas::open($source);
+
+            // Telefon fotoğrafları 4000 px'i geçiyor; kapak için 2400 px fazlasıyla yeter.
+            if (max($canvas->width(), $canvas->height()) > 2400) {
+                $canvas = $canvas->contain(2400, 2400);
+            }
+
+            return $canvas->toJpeg($directory.'/'.self::UPLOAD_FILES[$kind], 92);
+        } catch (\Throwable) {
+            throw new RuntimeException('Görsel okunamadı; JPG, PNG ya da WebP olmalı.');
+        } finally {
+            Canvas::flushDecoded();
+        }
+    }
+
+    /**
+     * Son yüklenen görseller; indirme bağlantıları kadar saklanır.
+     *
+     * @return array{afis?: string, arka_plan?: string}
+     */
+    public function uploads(int $userId): array
+    {
+        $cutoff = now()->subDays(self::LINK_DAYS)->getTimestamp();
+        $found = [];
+
+        foreach (self::UPLOAD_FILES as $kind => $file) {
+            $path = $this->userDirectory($userId).'/'.self::UPLOADS.'/'.$file;
+
+            if (is_file($path) && (@filemtime($path) ?: 0) >= $cutoff) {
+                $found[$kind] = $path;
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * İnternetteki bir görseli indirip görsel yuvasına koy.
+     *
+     * Sunucu bu adrese kendisi istek attığı için iç ağa (127.0.0.1, 10.x,
+     * bulut metadata adresi…) yönelen adresler reddedilir; çözülen IP isteğe
+     * sabitlenir ki DNS arada değişip iç ağa dönemesin. Yönlendirmeler de
+     * her adımda aynı denetimden geçer.
+     */
+    public function storeFromUrl(int $userId, string $kind, string $url): string
+    {
+        for ($hop = 0; ; $hop++) {
+            [$host, $port, $ip] = $this->publicTarget($url);
+
+            $response = Http::timeout(20)
+                ->withoutRedirecting()
+                ->withHeaders(['User-Agent' => 'Mozilla/5.0 (BannerArchive)', 'Accept' => 'image/*'])
+                ->withOptions(['curl' => [CURLOPT_RESOLVE => ["{$host}:{$port}:{$ip}"]]])
+                ->get($url);
+
+            if (! $response->redirect() || $hop === 3) {
+                break;
+            }
+
+            $url = (string) UriResolver::resolve(new Uri($url), new Uri((string) $response->header('Location')));
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException("Görsel indirilemedi (HTTP {$response->status()}). Doğrudan görsel dosyasına giden bir adres verin.");
+        }
+
+        $body = $response->body();
+
+        if ($body === '' || strlen($body) > self::MAX_REMOTE_BYTES) {
+            throw new RuntimeException('Görsel boş ya da 15 MB\'tan büyük.');
+        }
+
+        $temp = tempnam(sys_get_temp_dir(), 'kapak');
+
+        try {
+            file_put_contents($temp, $body);
+
+            return $this->storeUpload($userId, $kind, $temp);
+        } finally {
+            @unlink($temp);
+        }
     }
 
     /** Giriş gerektirmeyen, süreli indirme bağlantısı. */
@@ -206,6 +338,42 @@ final class CoverGenerator
         $path = $this->userDirectory($userId).'/'.$batch.'/'.$file;
 
         return is_file($path) ? $path : null;
+    }
+
+    /**
+     * Adres yalnızca internetteki bir sunucuya gidebilir.
+     *
+     * @return array{0: string, 1: int, 2: string} host, port, sabitlenecek IP
+     */
+    private function publicTarget(string $url): array
+    {
+        $parts = parse_url($url);
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $host = (string) ($parts['host'] ?? '');
+
+        if (! in_array($scheme, ['http', 'https'], true) || $host === '' || isset($parts['user'])) {
+            throw new RuntimeException('Görsel adresi http(s):// ile başlamalı.');
+        }
+
+        $port = (int) ($parts['port'] ?? ($scheme === 'https' ? 443 : 80));
+
+        if (! in_array($port, [80, 443], true)) {
+            throw new RuntimeException('Görsel adresi standart bir port kullanmalı.');
+        }
+
+        $ips = gethostbynamel($host) ?: [];
+
+        if ($ips === []) {
+            throw new RuntimeException("{$host} adresi bulunamadı.");
+        }
+
+        foreach ($ips as $ip) {
+            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                throw new RuntimeException('Bu adres iç ağa gidiyor; yalnızca internetteki görseller indirilebilir.');
+            }
+        }
+
+        return [$host, $port, $ips[0]];
     }
 
     private function userDirectory(int $userId): string

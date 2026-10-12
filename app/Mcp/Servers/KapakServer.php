@@ -7,6 +7,7 @@ use App\Mcp\Tools\EngelliIplerTool;
 use App\Mcp\Tools\FilmAraTool;
 use App\Mcp\Tools\GirisGecmisiTool;
 use App\Mcp\Tools\GorselSecenekleriTool;
+use App\Mcp\Tools\GorselYuklemeLinkiTool;
 use App\Mcp\Tools\GuvenlikLoglariTool;
 use App\Mcp\Tools\KapakUretTool;
 use App\Mcp\Tools\PanelOzetiTool;
@@ -17,7 +18,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
 
 #[Name('BannerArchive Yönetim Paneli')]
-#[Version('1.1.0')]
+#[Version('1.2.0')]
 #[Instructions(<<<'MD'
 BannerArchive (bannerarchive.elw.com.tr) admin panelinin araçları. Kullanıcı sitenin sahibi ve HIZ istiyor.
 
@@ -30,6 +31,17 @@ Kapak üretiminde soru sorma, doğrudan üret.
 
 Film yanlış eşleştiyse (yanıttaki "diğer eşleşmeler"), `tmdb_id` ile doğrusunu üret. Kullanıcı "beğenmedim", "başka arka plan", "logo değişsin" derse `gorsel_secenekleri`'ne bakıp yeni numarayla üret.
 
+Yazı ve yerleşim — kullanıcı söylediyse uygula, söylemediyse varsayılanda bırak:
+- Şerit metni serbest: "Biletinizi Şimdi Alın" dediyse `serit`'e aynen yaz.
+- "Şeridi üste al" → `serit_konum=ust`; "şerit büyük/küçük olsun" → `serit_boyut=buyuk|kucuk`.
+- Şeridin altına ek yazı ("altına Yalnızca Avşar Sinemalarında yaz") → `ikinci_satir`.
+- Bunları değiştirmek için kullanıcıya soru sorma; aynı film ve görsel numaralarıyla `kapak_uret`'i yeniden çağır.
+
+Kendi görseliyle kapak:
+- Sohbete eklenen resim bu sunucuya İLETİLEMEZ. Kullanıcı resim ekleyip "bununla yap" derse bunu dürüstçe söyle ve `gorsel_yukleme_linki` bağlantısını ver; "yükledim" deyince `kapak_uret`'i `yuklenen_gorsel=true` ile çağır.
+- Kullanıcı görselin internet adresini verdiyse `afis_url` (dikey) ya da `arka_plan_url` (yatay) kullan.
+- Yapım TMDB'de yoksa ya da yanlış filme eşleşiyorsa `tmdb_yok=true` ve `film_adi` ver.
+
 ## Site durumu (yalnızca okuma)
 - Genel durum sorularında önce `panel_ozeti`; ayrıntı için `giris_gecmisi`, `aktivite_loglari`, `guvenlik_loglari`, `engelli_ipler`, `particle_temalari`.
 - Logları özetlerken ham listeyi kopyalama: önemli olanı söyle (örn. "dün 3 IP rate limit'ten banlandı, hepsi bot gibi görünüyor").
@@ -40,6 +52,7 @@ class KapakServer extends Server
     protected array $tools = [
         KapakUretTool::class,
         GorselSecenekleriTool::class,
+        GorselYuklemeLinkiTool::class,
         FilmAraTool::class,
         PanelOzetiTool::class,
         GirisGecmisiTool::class,

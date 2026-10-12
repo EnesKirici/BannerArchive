@@ -16,7 +16,7 @@ use Laravel\Mcp\Server\Tool;
 use RuntimeException;
 
 #[Name('kapak_uret')]
-#[Description('Film/dizi için YouTube fragman kapakları üretir: video (16:9, 3 şablon) ve/veya Shorts (9:16, 2 şablon). Her kapağın küçük önizlemesini ve 3 gün geçerli indirme bağlantısını döndürür. Film adı yeterli; arka plan, afiş ve logo otomatik seçilir, istenirse gorsel_secenekleri numarasıyla değiştirilir.')]
+#[Description('Film/dizi için YouTube fragman kapakları üretir: video (16:9, 3 şablon) ve/veya Shorts (9:16, 2 şablon). Her kapağın küçük önizlemesini ve 3 gün geçerli indirme bağlantısını döndürür. Film adı yeterli; arka plan, afiş ve logo otomatik seçilir, istenirse gorsel_secenekleri numarasıyla değiştirilir. Kendi görseli: yuklenen_gorsel (gorsel_yukleme_linki ile yüklenen) ya da afis_url / arka_plan_url. TMDB\'de olmayan yapımda tmdb_yok=true + film_adi.')]
 class KapakUretTool extends Tool
 {
     private const LOGO_MODES = ['otomatik' => 'auto', 'turkce' => 'tr', 'yazi' => 'text', 'yok' => 'yok'];
@@ -24,7 +24,7 @@ class KapakUretTool extends Tool
     public function handle(Request $request, CoverGenerator $covers, ThumbnailComposer $composer): Response|ResponseFactory
     {
         $validated = $request->validate([
-            'film' => ['required_without:tmdb_id', 'nullable', 'string', 'min:2', 'max:120'],
+            'film' => ['required_without_all:tmdb_id,film_adi', 'nullable', 'string', 'min:2', 'max:120'],
             'tmdb_id' => ['nullable', 'integer', 'min:1'],
             'tur' => ['nullable', 'in:movie,tv'],
             'yil' => ['nullable', 'integer', 'between:1900,2100'],
@@ -39,35 +39,71 @@ class KapakUretTool extends Tool
             'marka_logosu' => ['nullable', 'boolean'],
             'marka_beyaz' => ['nullable', 'boolean'],
             'yil_tur' => ['nullable', 'boolean'],
+            'serit_konum' => ['nullable', 'in:alt,ust'],
+            'serit_boyut' => ['nullable', 'in:'.implode(',', array_keys(CoverSettings::RIBBON_SCALES))],
+            'ikinci_satir' => ['nullable', 'string', 'max:60'],
+            'yuklenen_gorsel' => ['nullable', 'boolean'],
+            'afis_url' => ['nullable', 'string', 'url', 'max:2048'],
+            'arka_plan_url' => ['nullable', 'string', 'url', 'max:2048'],
+            'tmdb_yok' => ['nullable', 'boolean'],
+            'yil_tur_metni' => ['nullable', 'string', 'max:60'],
         ], [
-            'film.required_without' => 'Film adı (film) ya da tmdb_id gerekli.',
+            'film.required_without_all' => 'Film adı (film) ya da tmdb_id gerekli.',
             'renk.regex' => 'renk: "marka", "oto" ya da #rrggbb olmalı.',
         ]);
 
         $userId = (int) $request->user()?->getAuthIdentifier();
 
         try {
-            [$type, $id, $others] = $this->resolveTitle($covers, $validated);
-
+            $custom = $this->customImages($covers, $userId, $validated);
+            $manual = (bool) ($validated['tmdb_yok'] ?? false);
+            $others = [];
             $choices = [];
 
-            foreach (['arka_plan' => 'arka_plan', 'afis' => 'afis', 'logo_no' => 'logo'] as $parameter => $kind) {
-                if (isset($validated[$parameter])) {
-                    $choices[$kind] = $this->pick($covers, $type, $id, $kind, (int) $validated[$parameter]);
+            if (! $manual) {
+                try {
+                    [$type, $id, $others] = $this->resolveTitle($covers, $validated);
+                } catch (RuntimeException $exception) {
+                    // TMDB'de yok ama görsel elimizde: kendi görseliyle devam.
+                    if ($custom === [] || isset($validated['tmdb_id'])) {
+                        throw $exception;
+                    }
+
+                    $manual = true;
                 }
+            }
+
+            if ($manual) {
+                $title = trim((string) ($validated['film_adi'] ?? $validated['film'] ?? ''));
+                $payload = $covers->manualPayload($title, $validated['yil_tur_metni'] ?? null);
+            } else {
+                foreach (['arka_plan' => 'arka_plan', 'afis' => 'afis', 'logo_no' => 'logo'] as $parameter => $kind) {
+                    if (isset($validated[$parameter])) {
+                        $choices[$kind] = $this->pick($covers, $type, $id, $kind, (int) $validated[$parameter]);
+                    }
+                }
+
+                $payload = $covers->tmdbPayload($type, $id, $choices);
+            }
+
+            if (isset($custom['afis'])) {
+                $payload = $payload->withPoster($custom['afis']);
+            }
+
+            if (isset($custom['arka_plan'])) {
+                $payload = $payload->withBackdrop($custom['arka_plan']);
             }
 
             $result = $covers->generate(
                 $userId,
-                $type,
-                $id,
-                $this->settings($validated, isset($choices['logo'])),
+                $payload,
+                $this->settings($validated, isset($choices['logo']), $manual ? $payload->title : null),
                 match ($validated['bicim'] ?? 'ikisi') {
                     'video' => ['video'],
                     'shorts' => ['shorts'],
                     default => ['video', 'shorts'],
                 },
-                $choices,
+                $manual,
             );
         } catch (RuntimeException $exception) {
             return Response::error($exception->getMessage());
@@ -76,7 +112,13 @@ class KapakUretTool extends Tool
         $labels = $composer->options();
         $formats = $composer->formats();
 
-        $summary = sprintf('%s · %s · tmdb_id=%d, tur=%s — %d kapak üretildi.', $result['title'], $type === 'tv' ? 'dizi' : 'film', $id, $type, count($result['rendered']));
+        $summary = $manual
+            ? sprintf('%s · kendi görseliyle (TMDB\'siz) — %d kapak üretildi.', $result['title'], count($result['rendered']))
+            : sprintf('%s · %s · tmdb_id=%d, tur=%s — %d kapak üretildi.', $result['title'], $type === 'tv' ? 'dizi' : 'film', $id, $type, count($result['rendered']));
+
+        if ($custom !== []) {
+            $summary .= "\nKendi görseli kullanıldı: ".collect(array_keys($custom))->map(fn (string $kind): string => $kind === 'afis' ? 'afiş' : 'arka plan')->implode(', ').'.';
+        }
 
         if ($result['notice'] !== null) {
             $summary .= "\nNot: ".$result['notice'];
@@ -133,6 +175,14 @@ class KapakUretTool extends Tool
             'marka_logosu' => $schema->boolean()->description('Köşeye Avşar Sinema logosu basılsın mı.')->default(true),
             'marka_beyaz' => $schema->boolean()->description('Marka logosu beyaza boyansın mı.')->default(false),
             'yil_tur' => $schema->boolean()->description('"2026 • Aksiyon" satırı basılsın mı.')->default(true),
+            'serit_konum' => $schema->string()->enum(['alt', 'ust'])->description('alt = film adının altında (varsayılan) · ust = kapağın en tepesinde.')->default('alt'),
+            'serit_boyut' => $schema->string()->enum(array_keys(CoverSettings::RIBBON_SCALES))->description('Şeridin boyutu; çok uzun metin sığmazsa kendiliğinden küçülür.')->default('normal'),
+            'ikinci_satir' => $schema->string()->description('Şeridin altına küçük harflerle ikinci bir yazı (örn. "Yalnızca Avşar Sinemalarında"). Şerit üstteyse film adının altına yazılır.'),
+            'yuklenen_gorsel' => $schema->boolean()->description('gorsel_yukleme_linki sayfasından yüklenen afiş/arka planı kullan (TMDB görselinin yerine geçer).'),
+            'afis_url' => $schema->string()->description('İnternetteki bir afiş görselinin doğrudan adresi (.jpg/.png/.webp). Shorts zemini ve afiş kartı olur.'),
+            'arka_plan_url' => $schema->string()->description('İnternetteki yatay bir sahne görselinin doğrudan adresi. Video kapaklarının zemini olur.'),
+            'tmdb_yok' => $schema->boolean()->description('Yapım TMDB\'de yoksa ya da yanlış eşleşiyorsa true: yalnızca kendi görseli ve film_adi (ya da film) kullanılır. Film TMDB\'de bulunamazsa ve kendi görseli varsa bu kendiliğinden olur.'),
+            'yil_tur_metni' => $schema->string()->description('TMDB\'siz üretimde yıl • tür satırı (örn. "2026 • Komedi"); boşsa basılmaz.'),
         ];
     }
 
@@ -157,6 +207,33 @@ class KapakUretTool extends Tool
         return [$first['type'], $first['id'], array_slice($results, 0, 4)];
     }
 
+    /**
+     * Kullanıcının kendi görselleri: adresten indirilenler, yüklenenlerin önüne geçer.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array{afis?: string, arka_plan?: string}
+     */
+    private function customImages(CoverGenerator $covers, int $userId, array $validated): array
+    {
+        $custom = [];
+
+        if ($validated['yuklenen_gorsel'] ?? false) {
+            $custom = $covers->uploads($userId);
+
+            if ($custom === []) {
+                throw new RuntimeException('Yüklenmiş görsel yok (ya da süresi doldu). Önce gorsel_yukleme_linki ile bağlantıyı ver.');
+            }
+        }
+
+        foreach (['afis_url' => 'afis', 'arka_plan_url' => 'arka_plan'] as $parameter => $kind) {
+            if (isset($validated[$parameter])) {
+                $custom[$kind] = $covers->storeFromUrl($userId, $kind, (string) $validated[$parameter]);
+            }
+        }
+
+        return $custom;
+    }
+
     private function pick(CoverGenerator $covers, string $type, int $id, string $kind, int $number): string
     {
         $options = $covers->options($type, $id, $kind);
@@ -168,7 +245,7 @@ class KapakUretTool extends Tool
     /**
      * @param  array<string, mixed>  $validated
      */
-    private function settings(array $validated, bool $logoChosen): CoverSettings
+    private function settings(array $validated, bool $logoChosen, ?string $manualTitle = null): CoverSettings
     {
         $ribbon = trim((string) ($validated['serit'] ?? 'altyazi'));
         $color = (string) ($validated['renk'] ?? 'marka');
@@ -178,13 +255,16 @@ class KapakUretTool extends Tool
                 ? CoverSettings::ribbonFor(mb_strtolower($ribbon))
                 : $ribbon,
             logoMode: self::LOGO_MODES[$validated['logo'] ?? 'otomatik'],
-            customTitle: (string) ($validated['film_adi'] ?? ''),
+            customTitle: $manualTitle ?? (string) ($validated['film_adi'] ?? ''),
             showMeta: (bool) ($validated['yil_tur'] ?? true),
             accentMode: str_starts_with($color, '#') ? 'ozel' : $color,
             accent: str_starts_with($color, '#') ? $color : '',
             brand: (bool) ($validated['marka_logosu'] ?? true),
             brandWhite: (bool) ($validated['marka_beyaz'] ?? false),
             logoChosen: $logoChosen,
+            ribbonPosition: (string) ($validated['serit_konum'] ?? 'alt'),
+            ribbonSize: (string) ($validated['serit_boyut'] ?? 'normal'),
+            tagline: (string) ($validated['ikinci_satir'] ?? ''),
         );
     }
 }

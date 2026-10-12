@@ -59,7 +59,7 @@ final class PosterFocusTemplate extends AbstractTemplate
             $this->accentBar($canvas, $columnX, $metaBaseline - 48, $accent);
         }
 
-        $this->ribbon($canvas, $payload->ribbon, $columnX, 468, $accent);
+        $this->ribbonGroup($canvas, $payload, $columnX, 468, $columnWidth, $accent);
         // Afiş sağda durduğu için logo sol alta gider.
         $this->brandMark($canvas, $payload, 'left');
 

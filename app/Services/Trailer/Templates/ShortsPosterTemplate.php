@@ -62,7 +62,7 @@ final class ShortsPosterTemplate extends AbstractTemplate
             $this->accentBar($canvas, $centerX, $metaBaseline - 54, $accent, 96, 'center');
         }
 
-        $this->ribbon($canvas, $payload->ribbon, $centerX, 1600, $accent, 'center', 1.3);
+        $this->ribbonGroup($canvas, $payload, $centerX, 1600, $width - 180, $accent, 'center', 1.3);
         $this->brandMark($canvas, $payload);
 
         return $canvas;

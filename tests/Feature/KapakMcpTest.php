@@ -5,12 +5,14 @@ declare(strict_types=1);
 use App\Mcp\Servers\KapakServer;
 use App\Mcp\Tools\FilmAraTool;
 use App\Mcp\Tools\GorselSecenekleriTool;
+use App\Mcp\Tools\GorselYuklemeLinkiTool;
 use App\Mcp\Tools\KapakUretTool;
 use App\Models\User;
 use App\Services\Trailer\CoverGenerator;
 use App\Services\Trailer\CoverSettings;
 use App\Services\Trailer\ThumbnailPayload;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Laravel\Passport\Passport;
@@ -167,7 +169,7 @@ test('imzalı bağlantı kapağı girişsiz sunar, imzasızı reddeder', functio
     $admin = User::factory()->create(['is_admin' => true]);
     $covers = app(CoverGenerator::class);
 
-    $result = $covers->generate($admin->id, 'movie', 900, new CoverSettings(ribbon: 'Deneme'), ['video']);
+    $result = $covers->generate($admin->id, $covers->tmdbPayload('movie', 900), new CoverSettings(ribbon: 'Deneme'), ['video']);
     $path = array_values($result['rendered'])[0];
     $url = $covers->downloadUrl($admin->id, $result['batch'], $path);
 
@@ -187,3 +189,133 @@ test('şerit tercihleri payload\'a doğru uygulanır', function () {
         ->and(CoverSettings::ribbonFor('dublaj'))->toBe('Türkçe Dublaj Fragman')
         ->and(CoverSettings::ribbonFor('ozel', '  Yakında  '))->toBe('Yakında');
 });
+
+test('şerit konumu, boyutu ve ikinci satır payload\'a geçer', function () {
+    $payload = new ThumbnailPayload(title: 'Fall 2', poster: 'a.jpg');
+
+    [$ayarli] = (new CoverSettings(ribbon: 'Biletinizi Şimdi Alın', ribbonPosition: 'ust', ribbonSize: 'buyuk', tagline: '  Yalnızca Avşar Sinemalarında '))->apply($payload);
+    [$varsayilan] = (new CoverSettings(ribbon: 'Deneme', ribbonPosition: 'yan', ribbonSize: 'dev'))->apply($payload);
+
+    expect($ayarli->ribbonPosition)->toBe('ust')
+        ->and($ayarli->ribbonScale)->toBe(1.35)
+        ->and($ayarli->tagline)->toBe('Yalnızca Avşar Sinemalarında')
+        ->and($ayarli->withoutMeta()->tagline)->toBe('Yalnızca Avşar Sinemalarında')
+        ->and($varsayilan->ribbonPosition)->toBe('alt')
+        ->and($varsayilan->ribbonScale)->toBe(1.0)
+        ->and($varsayilan->tagline)->toBeNull();
+});
+
+test('üstte büyük şerit ve ikinci satırla bütün kapaklar üretilir', function () {
+    KapakServer::actingAs(User::factory()->create(['is_admin' => true]))
+        ->tool(KapakUretTool::class, [
+            'tmdb_id' => 900,
+            'tur' => 'movie',
+            'serit' => 'Biletinizi Şimdi Alın — Ön Satışlar Başladı, Kaçırmayın',
+            'serit_konum' => 'ust',
+            'serit_boyut' => 'buyuk',
+            'ikinci_satir' => 'Yalnızca Avşar Sinemalarında',
+        ])
+        ->assertOk()
+        ->assertSee('5 kapak üretildi');
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
+test('geçersiz şerit konumu reddedilir', function () {
+    KapakServer::actingAs(User::factory()->create(['is_admin' => true]))
+        ->tool(KapakUretTool::class, ['film' => 'Fall 2', 'serit_konum' => 'yan'])
+        ->assertHasErrors();
+});
+
+test('yükleme bağlantısı aracı süreli imzalı sayfa verir', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+
+    KapakServer::actingAs($admin)
+        ->tool(GorselYuklemeLinkiTool::class)
+        ->assertOk()
+        ->assertSee(['/kapak-gorseli/'.$admin->id.'?', 'signature=', 'Şu an yüklü görsel yok.']);
+});
+
+test('yükleme sayfası imzasız açılmaz, imzalıyla görsel kaydedilir', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $url = app(CoverGenerator::class)->uploadUrl($admin->id);
+
+    $this->get(strtok($url, '?'))->assertForbidden();
+    $this->get($url)->assertOk()->assertSee('Kapak görseli yükle');
+
+    $this->from($url)
+        ->post($url, ['afis' => UploadedFile::fake()->image('afis.png', 600, 900)])
+        ->assertRedirect($url)
+        ->assertSessionHas('saved', ['afis']);
+
+    expect(app(CoverGenerator::class)->uploads($admin->id))->toHaveKey('afis')
+        ->not->toHaveKey('arka_plan');
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
+test('yükleme sayfası görsel olmayan dosyayı ve boş formu reddeder', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $url = app(CoverGenerator::class)->uploadUrl($admin->id);
+
+    $this->from($url)->post($url, [])->assertSessionHasErrors('afis');
+    $this->from($url)
+        ->post($url, ['afis' => UploadedFile::fake()->create('kotu.php', 10, 'application/x-php')])
+        ->assertSessionHasErrors('afis');
+
+    expect(app(CoverGenerator::class)->uploads($admin->id))->toBe([]);
+});
+
+test('yüklenen görselle TMDB\'siz kapak üretilir', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $source = $this->work.'/kaynak.jpg';
+    File::ensureDirectoryExists($this->work);
+    file_put_contents($source, mcpSahteGorsel(600, 900));
+    app(CoverGenerator::class)->storeUpload($admin->id, 'afis', $source);
+
+    KapakServer::actingAs($admin)
+        ->tool(KapakUretTool::class, ['film_adi' => 'Damat Mektebi', 'tmdb_yok' => true, 'yuklenen_gorsel' => true, 'yil_tur_metni' => '2026 • Komedi'])
+        ->assertOk()
+        ->assertSee(['Damat Mektebi · kendi görseliyle', 'Kendi görseli kullanıldı: afiş', '/kapak/'.$admin->id.'/'])
+        ->assertDontSee('tmdb_id=');
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
+test('yüklenmiş görsel yokken yuklenen_gorsel anlaşılır hata verir', function () {
+    KapakServer::actingAs(User::factory()->create(['is_admin' => true]))
+        ->tool(KapakUretTool::class, ['film' => 'Fall 2', 'yuklenen_gorsel' => true])
+        ->assertHasErrors(['Yüklenmiş görsel yok (ya da süresi doldu). Önce gorsel_yukleme_linki ile bağlantıyı ver.']);
+});
+
+test('internetteki görselin adresiyle kapak üretilir', function () {
+    Http::fake(['93.184.216.34/*' => Http::response(mcpSahteGorsel(600, 900), 200, ['Content-Type' => 'image/jpeg'])]);
+
+    KapakServer::actingAs(User::factory()->create(['is_admin' => true]))
+        ->tool(KapakUretTool::class, ['tmdb_id' => 900, 'tur' => 'movie', 'bicim' => 'shorts', 'afis_url' => 'http://93.184.216.34/afis.jpg'])
+        ->assertOk()
+        ->assertSee('Kendi görseli kullanıldı: afiş');
+})->skip(! extension_loaded('gd'), 'GD eklentisi yok');
+
+test('iç ağa giden görsel adresleri indirilmez', function (string $url) {
+    KapakServer::actingAs(User::factory()->create(['is_admin' => true]))
+        ->tool(KapakUretTool::class, ['tmdb_id' => 900, 'tur' => 'movie', 'afis_url' => $url])
+        ->assertHasErrors(['Bu adres iç ağa gidiyor; yalnızca internetteki görseller indirilebilir.']);
+
+    Http::assertNotSent(fn (HttpRequest $request): bool => str_contains($request->url(), parse_url($url, PHP_URL_HOST)));
+})->with([
+    'localhost' => 'http://127.0.0.1/afis.jpg',
+    'yerel ağ' => 'http://192.168.1.10/afis.jpg',
+    'bulut metadata' => 'http://169.254.169.254/latest/meta-data',
+]);
+
+test('iç ağa yönlendiren görsel adresi de reddedilir', function () {
+    Http::fake(['93.184.216.34/*' => Http::response('', 302, ['Location' => 'http://127.0.0.1/gizli.jpg'])]);
+
+    KapakServer::actingAs(User::factory()->create(['is_admin' => true]))
+        ->tool(KapakUretTool::class, ['tmdb_id' => 900, 'tur' => 'movie', 'afis_url' => 'http://93.184.216.34/afis.jpg'])
+        ->assertHasErrors(['Bu adres iç ağa gidiyor; yalnızca internetteki görseller indirilebilir.']);
+});
+
+test('görsel adresi standart dışı port ve şema kullanamaz', function (string $url, string $message) {
+    KapakServer::actingAs(User::factory()->create(['is_admin' => true]))
+        ->tool(KapakUretTool::class, ['tmdb_id' => 900, 'tur' => 'movie', 'arka_plan_url' => $url])
+        ->assertHasErrors([$message]);
+})->with([
+    'port' => ['http://93.184.216.34:6379/x.jpg', 'Görsel adresi standart bir port kullanmalı.'],
+    'ftp' => ['ftp://93.184.216.34/x.jpg', 'Görsel adresi http(s):// ile başlamalı.'],
+]);

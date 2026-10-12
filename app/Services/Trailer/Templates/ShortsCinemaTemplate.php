@@ -63,7 +63,7 @@ final class ShortsCinemaTemplate extends AbstractTemplate
             $this->accentBar($canvas, $centerX, $metaBaseline - 56, $accent, 96, 'center');
         }
 
-        $this->ribbon($canvas, $payload->ribbon, $centerX, 1608, $accent, 'center', 1.3);
+        $this->ribbonGroup($canvas, $payload, $centerX, 1608, $width - 160, $accent, 'center', 1.3);
         $this->brandMark($canvas, $payload);
 
         return $canvas;

@@ -165,7 +165,45 @@ abstract class AbstractTemplate implements ThumbnailTemplate
     }
 
     /**
-     * Vurgu şeridi (pill). Genişlik metne göre hesaplanır.
+     * Şerit ve altındaki ikinci satır.
+     *
+     * ($x, $y) şeridin başlık altındaki yeridir. Şerit üste alındıysa kapağın
+     * tepesine çıkar ve ikinci satır onun boşalttığı yere yazılır.
+     */
+    protected function ribbonGroup(
+        Canvas $canvas,
+        ThumbnailPayload $payload,
+        int $x,
+        int $y,
+        int $maxWidth,
+        string $accent,
+        string $align = 'left',
+        float $scale = 1.0,
+    ): void {
+        $onTop = $payload->ribbonPosition === 'ust';
+        $topY = $this->format() === 'shorts' ? 40 : 46;
+
+        $ribbon = $this->ribbon($canvas, $payload->ribbon, $x, $onTop ? $topY : $y, $accent, $align, $scale * $payload->ribbonScale, $maxWidth);
+
+        if ($payload->tagline === null) {
+            return;
+        }
+
+        $taglineTop = $onTop || $ribbon['height'] === 0 ? $y : $y + $ribbon['height'] + (int) round(20 * $scale);
+
+        $text = TextBox::make($this->font('ui_soft'), 30 * $scale)
+            ->uppercase()
+            ->tracking(1.6 * $scale)
+            ->color('#ffffff')
+            ->shadow(0, 3, '#000000', 0.6)
+            ->fit($payload->tagline, $maxWidth, 1, 16);
+
+        $text->drawBaseline($canvas, $payload->tagline, $x, $taglineTop + $text->measure($payload->tagline)['capHeight'], $align);
+    }
+
+    /**
+     * Vurgu şeridi (pill). Genişlik metne göre hesaplanır; $maxWidth'e
+     * sığmayan uzun metinde şerit bütünüyle küçültülür.
      *
      * @return array{width: int, height: int}
      */
@@ -177,10 +215,18 @@ abstract class AbstractTemplate implements ThumbnailTemplate
         string $accent,
         string $align = 'left',
         float $scale = 1.0,
+        ?int $maxWidth = null,
     ): array {
         // Şerit istenmemiş: hiç çizme, yerleşim hesabına da girmesin.
         if (trim($text) === '') {
             return ['width' => 0, 'height' => 0];
+        }
+
+        $label = TextBox::make($this->font('condensed'), 34 * $scale)->uppercase()->tracking(3.2 * $scale);
+        $width = $label->measure($text)['width'] + (int) round(28 * $scale) * 2;
+
+        if ($maxWidth !== null && $width > $maxWidth) {
+            $scale *= max(0.6, $maxWidth / $width);
         }
 
         $height = (int) round(62 * $scale);

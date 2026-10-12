@@ -103,6 +103,6 @@ test('MCP sunucusu yalnızca okuma araçlarını ve kapak araçlarını sunar', 
 
     expect($tools->sort()->values()->all())->toBe([
         'aktivite_loglari', 'engelli_ipler', 'film_ara', 'giris_gecmisi', 'gorsel_secenekleri',
-        'guvenlik_loglari', 'kapak_uret', 'panel_ozeti', 'particle_temalari',
+        'gorsel_yukleme_linki', 'guvenlik_loglari', 'kapak_uret', 'panel_ozeti', 'particle_temalari',
     ]);
 });

@@ -57,7 +57,7 @@ final class PosterCardTemplate extends AbstractTemplate
             $this->accentBar($canvas, $columnX, $metaBaseline - 48, $accent);
         }
 
-        $this->ribbon($canvas, $payload->ribbon, $columnX, 463, $accent);
+        $this->ribbonGroup($canvas, $payload, $columnX, 463, $columnWidth, $accent);
         $this->brandMark($canvas, $payload);
 
         return $canvas;
