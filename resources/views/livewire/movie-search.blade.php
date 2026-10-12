@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\TmdbClient;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -8,12 +9,20 @@ new class extends Component
 {
     public string $search = '';
 
+    #[Locked]
     public string $filter = 'all'; // all, movie, tv
 
-    /** @var array<int, array<string, mixed>> */
+    /**
+     * Sunucuda doldurulur; istemci değiştiremez (bot istekleri listeyi
+     * bozup görünümü patlatıyordu).
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    #[Locked]
     public array $results = [];
 
     /** TMDB'ye ulaşılamadığında kullanıcıya gösterilecek uyarı. */
+    #[Locked]
     public ?string $tmdbError = null;
 
     public function updatedSearch(): void
@@ -32,15 +41,25 @@ new class extends Component
 
     public function setFilter(string $filter): void
     {
+        if (! in_array($filter, ['all', 'movie', 'tv'], true)) {
+            return;
+        }
+
         $this->filter = $filter;
     }
 
     #[On('select-from-sidebar')]
     public function selectFromSidebar(array $movie): void
     {
-        $this->results = [$movie];
-        $this->search = $movie['title'];
-        $this->filter = $movie['raw_type'];
+        $item = $this->sidebarItem($movie);
+
+        if ($item === null) {
+            return;
+        }
+
+        $this->results = [$item];
+        $this->search = $item['title'];
+        $this->filter = $item['raw_type'];
 
         $this->dispatch('results-updated', results: $this->results);
     }
@@ -95,6 +114,38 @@ new class extends Component
         $this->results = array_values(
             array_map(fn (array $item): array => $this->formatItem($item, $item['media_type']), $results)
         );
+    }
+
+    /**
+     * Kenar çubuğundan gelen yük istemciden geldiği için güvenilmez;
+     * yalnızca beklenen alanlar, beklenen tiplerle alınır.
+     *
+     * @param  array<string, mixed>  $movie
+     * @return array<string, mixed>|null
+     */
+    private function sidebarItem(array $movie): ?array
+    {
+        $id = $movie['id'] ?? null;
+        $title = $movie['title'] ?? null;
+
+        if (! is_numeric($id) || (int) $id <= 0 || ! is_string($title) || $title === '') {
+            return null;
+        }
+
+        $text = fn (string $key): string => is_string($movie[$key] ?? null) ? $movie[$key] : '';
+        $isMovie = ($movie['raw_type'] ?? null) !== 'tv';
+
+        return [
+            'id' => (int) $id,
+            'title' => $title,
+            'overview' => $text('overview'),
+            'poster_path' => $text('poster_path'),
+            'backdrop_path' => $text('backdrop_path'),
+            'vote_average' => is_numeric($movie['vote_average'] ?? null) ? (float) $movie['vote_average'] : 0,
+            'release_date' => $text('release_date') ?: null,
+            'type' => $isMovie ? 'Film' : 'Dizi',
+            'raw_type' => $isMovie ? 'movie' : 'tv',
+        ];
     }
 
     /**

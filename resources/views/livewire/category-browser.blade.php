@@ -1,15 +1,20 @@
 <?php
 
 use App\Services\TmdbClient;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 new class extends Component
 {
+    /** TMDB istek yoluna girdiği için yalnızca sunucuda, izin listesinden atanır. */
+    #[Locked]
     public string $mediaType = 'movie';
 
+    #[Locked]
     public string $category = 'popular';
 
     /** @var array<int, array<string, mixed>> */
+    #[Locked]
     public array $items = [];
 
     public function mount(): void
@@ -19,6 +24,10 @@ new class extends Component
 
     public function setMediaType(string $type): void
     {
+        if (! in_array($type, ['movie', 'tv'], true)) {
+            return;
+        }
+
         $this->mediaType = $type;
 
         if ($type === 'tv' && in_array($this->category, ['now_playing', 'upcoming'])) {
@@ -32,6 +41,10 @@ new class extends Component
 
     public function setCategory(string $category): void
     {
+        if (! array_key_exists($category, $this->getCategories())) {
+            return;
+        }
+
         $this->category = $category;
         $this->fetchItems();
     }
