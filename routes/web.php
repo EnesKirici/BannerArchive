@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\TrailerPreviewController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\McpCoverDownloadController;
 use App\Http\Controllers\TMDBController;
 use App\Http\Controllers\VideoDownloadController;
 use Illuminate\Support\Facades\Route;
@@ -61,3 +62,9 @@ Route::middleware(['auth', 'admin'])->group(function () {
         ->name('admin.trailers.preview')
         ->where('file', '[A-Za-z0-9_\-.]+');
 });
+
+// Claude'un (MCP) ürettiği kapaklar: oturum yerine süreli imzalı bağlantı.
+Route::get('/kapak/{user}/{batch}/{file}', McpCoverDownloadController::class)
+    ->name('mcp.covers.download')
+    ->middleware(['signed', 'throttle:60,1'])
+    ->where(['user' => '[0-9]+', 'batch' => '[a-z0-9]{16}', 'file' => '[a-z0-9\-_]+\.jpg']);

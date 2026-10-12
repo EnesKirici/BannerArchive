@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Passport\Passport;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -33,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
+
+        // Claude bağlayıcısı (MCP) giriş yapınca gösterilen "izin ver" ekranı.
+        Passport::authorizationView(fn (array $parameters) => view('mcp::authorize', $parameters));
 
         // Arama: guest 10/dk, auth 60/dk
         RateLimiter::for('search', function (Request $request) {

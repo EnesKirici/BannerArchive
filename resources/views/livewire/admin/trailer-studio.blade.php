@@ -12,6 +12,7 @@
 
 use App\Services\TmdbClient;
 use App\Services\Trailer\ArtworkFetcher;
+use App\Services\Trailer\CoverSettings;
 use App\Services\Trailer\ThumbnailComposer;
 use App\Services\Trailer\ThumbnailPayload;
 use App\Support\Image\Canvas;
@@ -535,49 +536,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
             'logo' => $payload->logo !== null,
         ];
 
-        $payload = $payload->with(
-            brand: $this->brand,
-            brandWhite: $this->brandStyle === 'beyaz',
-        );
-
-        // Boş şerit metni "şerit olmasın" demektir; with() boş değeri yok
-        // saydığı için ayrı ele alınıyor.
-        $ribbon = $this->ribbonText();
-        $payload = $ribbon === '' ? $payload->withoutRibbon() : $payload->with(ribbon: $ribbon);
-
-        $payload = match ($this->accentMode) {
-            'oto' => $payload->withoutAccent(),
-            'ozel' => $payload->with(accent: $this->accent),
-            default => $payload->with(accent: (string) config('trailer.defaults.accent')),
-        };
-
-        if (! $this->showMeta) {
-            $payload = $payload->withoutMeta();
-        }
-
-        $elleBaslik = trim($this->customTitle);
-
-        if ($this->manual) {
-            // Elle modda logo yok; ad yazıldıysa metin basılır, boşsa hiç basılmaz.
-            if ($elleBaslik === '') {
-                $payload = $payload->withoutTitle();
-                $this->notice = 'Film adı yazılmadı — kapakta ad basılmıyor.';
-            }
-        } elseif ($this->logoMode === 'yok') {
-            $payload = $payload->withoutTitle();
-        } elseif ($elleBaslik !== '') {
-            // Elle yazılan ad her şeyin önünde: logo değil bu metin basılır.
-            $payload = $payload->with(title: $elleBaslik)->withoutLogo();
-        } elseif ($this->logoChoice !== null) {
-            $this->notice = 'Logo elle seçildi — otomatik kurallar uygulanmadı.';
-        } elseif ($this->logoMode === 'text') {
-            $payload = $payload->withoutLogo();
-        } elseif ($this->logoMode === 'tr' && $payload->logoLanguage !== 'tr') {
-            $payload = $payload->withoutLogo();
-            $this->notice = 'TMDB’de Türkçe logo yok — başlık metni yazıldı.';
-        } elseif ($payload->logo !== null && $payload->logoLanguage !== 'tr') {
-            $this->notice = 'TMDB’de Türkçe logo yok, '.mb_strtoupper((string) $payload->logoLanguage).' logo kullanıldı.';
-        }
+        [$payload, $this->notice] = $this->coverSettings()->apply($payload, $this->manual);
 
         $this->renderThumbnails($payload, $composer);
     }
@@ -692,18 +651,20 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
         $this->renderedAt = now()->timestamp;
     }
 
-    /** Boş dönüş "şerit basılmasın" demektir. */
-    private function ribbonText(): string
+    /** Paneldeki tercihler; kurallar panel ve MCP aracı için ortak. */
+    private function coverSettings(): CoverSettings
     {
-        if ($this->ribbonKey === 'yok') {
-            return '';
-        }
-
-        if ($this->ribbonKey === 'ozel') {
-            return trim($this->customRibbon);
-        }
-
-        return (string) (config('trailer.ribbons')[$this->ribbonKey] ?? config('trailer.defaults.ribbon'));
+        return new CoverSettings(
+            ribbon: CoverSettings::ribbonFor($this->ribbonKey, $this->customRibbon),
+            logoMode: $this->logoMode,
+            customTitle: $this->customTitle,
+            showMeta: $this->showMeta,
+            accentMode: $this->accentMode,
+            accent: $this->accent,
+            brand: $this->brand,
+            brandWhite: $this->brandStyle === 'beyaz',
+            logoChosen: $this->logoChoice !== null,
+        );
     }
 };
 ?>

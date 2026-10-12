@@ -107,6 +107,9 @@ return [
     'storage' => [
         'artwork' => storage_path('app/private/trailer/artwork'),
         'thumbnails' => storage_path('app/private/trailer/thumbnails'),
+        // Claude'un (MCP) ürettiği kapaklar: kullanıcı/üretim klasörlerinde,
+        // süreli imzalı bağlantıyla indirilir.
+        'mcp' => storage_path('app/private/trailer/mcp'),
     ],
 
 ];
