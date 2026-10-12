@@ -187,6 +187,24 @@ test('kendi görseliyle TMDB olmadan kapak üretilir', function () {
     File::deleteDirectory($directory);
 })->skip(! extension_loaded('gd'), 'GD eklentisi yok');
 
+test('metin kutuları odak kaybında sunucuya gider ve Uygula butonu taşır', function () {
+    ozelKlasor();
+    actingAs(User::factory()->create(['is_admin' => true]));
+
+    // Livewire 4'te düz .blur istek atmaz; değişiklik ancak başka bir ayara
+    // dokununca uygulanıyordu.
+    Volt::test('admin.trailer-studio')
+        ->call('startManual')
+        ->set('format', 'video')
+        ->set('ribbonKey', 'ozel')
+        ->assertSeeHtml('wire:model.live.blur="customRibbon"')
+        ->assertSeeHtml('wire:model.live.blur="customTitle"')
+        ->assertSeeHtml('wire:model.live.blur="customMeta"')
+        ->assertSeeHtml('wire:keydown.enter.prevent="$commit"')
+        ->assertSee('Uygula')
+        ->assertDontSeeHtml('wire:model.blur=');
+});
+
 test('elle modda görsel yüklenmeden kapak üretilmez', function () {
     ozelKlasor();
     actingAs(User::factory()->create(['is_admin' => true]));

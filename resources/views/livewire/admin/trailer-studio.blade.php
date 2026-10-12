@@ -781,14 +781,12 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium mb-1.5">Film adı</label>
-                            <input wire:model.blur="customTitle" type="text" placeholder="Örn. Damat Mektebi"
-                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            @include('admin.partials.trailer-text-input', ['model' => 'customTitle', 'placeholder' => "Örn. Damat Mektebi"])
                             <p class="mt-1 text-[11px] text-neutral-600">Kapağa büyük harflerle basılır. Boş bırakılırsa ad basılmaz.</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1.5">Yıl • tür <span class="text-neutral-600 font-normal">(isteğe bağlı)</span></label>
-                            <input wire:model.blur="customMeta" type="text" placeholder="Örn. 2026 • Komedi"
-                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            @include('admin.partials.trailer-text-input', ['model' => 'customMeta', 'placeholder' => "Örn. 2026 • Komedi"])
                             <p class="mt-1 text-[11px] text-neutral-600">Afişin altındaki küçük satır. "Yıl • tür satırını göster" kapalıysa basılmaz.</p>
                         </div>
                     </div>
@@ -905,8 +903,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                             <span class="text-sm">Özel metin</span>
                         </label>
                         @if($ribbonKey === 'ozel')
-                            <input wire:model.blur="customRibbon" type="text" placeholder="Örn. Türkçe Fragman"
-                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            @include('admin.partials.trailer-text-input', ['model' => 'customRibbon', 'placeholder' => "Örn. Türkçe Fragman"])
                             <p class="text-[11px] text-neutral-600">Boş bırakılırsa şerit basılmaz.</p>
                         @endif
                     </div>
@@ -916,14 +913,12 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     <div class="space-y-3">
                         <div>
                             <label class="block text-sm font-medium mb-1.5">Film adı</label>
-                            <input wire:model.blur="customTitle" type="text" placeholder="Örn. Damat Mektebi"
-                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            @include('admin.partials.trailer-text-input', ['model' => 'customTitle', 'placeholder' => "Örn. Damat Mektebi"])
                             <p class="mt-1 text-[11px] text-neutral-600">Büyük harflerle basılır. Boş bırakılırsa ad basılmaz.</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1.5">Yıl • tür</label>
-                            <input wire:model.blur="customMeta" type="text" placeholder="Örn. 2026 • Komedi"
-                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            @include('admin.partials.trailer-text-input', ['model' => 'customMeta', 'placeholder' => "Örn. 2026 • Komedi"])
                         </div>
                     </div>
                 @else
@@ -944,8 +939,7 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                     </div>
                     @if($logoMode !== 'yok')
                         <div class="mt-3">
-                            <input wire:model.blur="customTitle" type="text" placeholder="Film adını elle yaz — örn. Kediler Müzede 2"
-                                   class="w-full bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-500/60">
+                            @include('admin.partials.trailer-text-input', ['model' => 'customTitle', 'placeholder' => "Film adını elle yaz — örn. Kediler Müzede 2"])
                             <p class="mt-1 text-[11px] text-neutral-600">Boşsa TMDB'nin adı (Türkçe yoksa İngilizce). Doluysa logo yerine bu metin basılır.</p>
                         </div>
                     @endif
@@ -1082,9 +1076,9 @@ new #[Layout('admin.layout')] #[Title('Kapak Stüdyosu')] class extends Componen
                         </label>
                         @if($accentMode === 'ozel')
                             <div class="flex gap-2">
-                                <input wire:model.blur="accent" type="text" placeholder="#00059e"
+                                <input wire:model.live.blur="accent" wire:keydown.enter.prevent="$commit" type="text" placeholder="#00059e"
                                        class="flex-1 bg-neutral-950 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-fuchsia-500/60">
-                                <input wire:model.blur="accent" type="color" class="w-11 h-[38px] bg-neutral-950 border border-white/10 rounded-lg cursor-pointer">
+                                <input wire:model.live.change="accent" type="color" class="w-11 h-[38px] bg-neutral-950 border border-white/10 rounded-lg cursor-pointer">
                             </div>
                         @endif
                     </div>
